@@ -1,7 +1,8 @@
 import streamlit as st
 import cv2
+import numpy as np
 from skimage.morphology import skeletonize
-import re 
+import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador EOR", layout="wide")
