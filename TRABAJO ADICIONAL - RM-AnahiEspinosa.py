@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 from skimage.morphology import skeletonize
 
 def analizar_micromodelo(ruta_imagen, caudal, ancho, espesor, porosidad):
