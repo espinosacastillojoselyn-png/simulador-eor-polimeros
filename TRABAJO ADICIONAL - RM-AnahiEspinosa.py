@@ -98,7 +98,7 @@ if archivo_subido is not None:
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
     
     q_cm3_s = caudal / 60.0
-    area_transversal_cm2 = ancho * thickness = espesor
+    area_transversal_cm2 = ancho * espesor
     v_darcy = q_cm3_s / area_transversal_cm2
     v_intersticial = v_darcy / porosidad
     velocidad_real = v_intersticial * tortuosidad
