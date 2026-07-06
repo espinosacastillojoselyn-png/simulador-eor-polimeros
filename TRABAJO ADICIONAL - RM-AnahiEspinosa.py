@@ -2,7 +2,7 @@ import streamlit as st
 import cv2
 import numpy as np
 from skimage.morphology import skeletonize
-import re
+import re 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Simulador EOR", layout="wide")
@@ -43,6 +43,7 @@ concentracion = st.sidebar.number_input("Concentración (ppm)", value=val_ppm)
 st.sidebar.markdown("---")
 st.sidebar.subheader("Datos Físicos del Modelo")
 ancho = st.sidebar.number_input("Ancho del modelo (cm)", value=5.0)
+longitud = st.sidebar.number_input("Longitud del modelo (cm)", value=5.0)
 espesor = st.sidebar.number_input("Espesor (cm)", value=0.1)
 
 tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
@@ -50,34 +51,37 @@ tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?",
 
 if tipo_porosidad == "Ingreso Manual":
     porosidad = st.sidebar.number_input("Porosidad (fracción)", min_value=0.01, max_value=1.0, value=0.40)
+    pixeles_vacios = None
 else:
     st.sidebar.success("La porosidad se calculará automáticamente con el Método de Otsu.")
     porosidad = None 
+    pixeles_vacios = None
 
 # --- 3. PROCESAMIENTO VISUAL Y CÁLCULOS MATEMÁTICOS ---
 if archivo_subido is not None:
     # Decodificar imagen subida
     file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, 1)
+    pixeles_totales = img.shape[0] * img.shape[1]
     
     # --- Cálculo de Porosidad Dinámica (Otsu) ---
-    if porosidad is None:
+    if porosidad is None or tipo_porosidad == "Calcular ópticamente desde la imagen":
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         umbral_optimo, mascara_poros = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         pixeles_vacios = np.sum(mascara_poros == 255)
-        pixeles_totales = img.shape[0] * img.shape[1]
         porosidad = pixeles_vacios / pixeles_totales
         
-        # Seguro matemático en caso de error de imagen extrema
         if porosidad == 0:
             porosidad = 0.001
             
         st.sidebar.info(f"Umbral automático (Otsu) calculado: {umbral_optimo:.0f}")
+    else:
+        # Si es manual, estimamos los píxeles vacíos teóricos del espacio poroso
+        pixeles_vacios = int(pixeles_totales * porosidad)
 
     # --- Aislamiento del Polímero y Esqueletización ---
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    # Rango para aislar la tinta azul (ajustable si se cambia el tinte del trazador)
     lower_blue = np.array([100, 50, 50])
     upper_blue = np.array([140, 255, 255])
     mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -94,20 +98,40 @@ if archivo_subido is not None:
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
     
     q_cm3_s = caudal / 60.0
-    area_cm2 = ancho * espesor
-    v_darcy = q_cm3_s / area_cm2
+    area_transversal_cm2 = ancho * thickness = espesor
+    v_darcy = q_cm3_s / area_transversal_cm2
     v_intersticial = v_darcy / porosidad
     velocidad_real = v_intersticial * tortuosidad
+
+    # --- NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA ---
+    pixeles_polimero = np.sum(mask_limpia == 255)
+    fraccion_modelo_invadida = pixeles_polimero / pixeles_totales
+    area_total_vista_superior = ancho * longitud
+    area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior
+    
+    # Eficiencia de barrido areal (EA) respecto al espacio poroso disponible
+    if pixeles_vacios and pixeles_vacios > 0:
+        eficiencia_barrido = min(1.0, pixeles_polimero / pixeles_vacios)
+    else:
+        eficiencia_barrido = 0.0
 
     # --- 4. PANEL DE RESULTADOS Y VISUALIZACIÓN ---
     st.markdown("---")
     st.subheader("📊 Resultados del Análisis")
     
+    # Fila 1: Parámetros Hidrodinámicos de los Canales
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm") 
-    col2.metric("Porosidad", f"{porosidad:.2%}")
-    col3.metric("Tortuosidad", f"{tortuosidad:.4f}")
+    col2.metric("Porosidad Óptica", f"{porosidad:.2%}")
+    col3.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
     col4.metric("Velocidad Canal", f"{velocidad_real:.6f} cm/s")
+    
+    # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
+    col_b.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
+    col_c.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
     
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["Original", "Binarización (Matriz)", "Esqueleto (Red de Canales)"])
@@ -117,7 +141,6 @@ if archivo_subido is not None:
     with tab2: 
         st.image(mask_limpia, use_container_width=True, clamp=True)
     with tab3: 
-        # Pintar el esqueleto de verde neón para máxima claridad visual
         esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
         esqueleto_color[esqueleto] = [0, 255, 0] 
         st.image(esqueleto_color, use_container_width=True, clamp=True)
@@ -128,18 +151,18 @@ if archivo_subido is not None:
     
     if tortuosidad > 8.0:
         comportamiento_red = "alta ramificación (amplia red de canales interconectados)."
-        eficiencia = "una mejora significativa en la eficiencia de barrido areal"
+        eficiencia_txt = "una mejora significativa en la eficiencia de barrido areal"
     elif tortuosidad > 3.0:
         comportamiento_red = "ramificación moderada."
-        eficiencia = "un barrido areal estándar con cierta mitigación de la canalización"
+        eficiencia_txt = "un barrido areal estándar con cierta mitigación de la canalización"
     else:
         comportamiento_red = "una ruta preferencial muy directa."
-        eficiencia = "una posible ruptura temprana (breakthrough) por digitación viscosa"
+        eficiencia_txt = "una posible ruptura temprana (breakthrough) por digitación viscosa"
 
     st.info(f"""
     **Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
     
-    * **Comportamiento Areal:** El valor de tortuosidad de **{tortuosidad:.2f}** indica {comportamiento_red} Al contrastar distintos fluidos, este parámetro nos revela que el **{tipo_polimero}** inyectado está logrando {eficiencia} frente al agua de formación, gracias al control sobre la relación de movilidad ($M \le 1$).
+    * **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica {comportamiento_red} Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando {eficiencia_txt} frente al agua de formación. El sistema ha alcanzado una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso.
     
-    * **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
+    * **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad interstitial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
     """)
