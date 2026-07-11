@@ -5,8 +5,8 @@ from skimage.morphology import skeletonize
 import re 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Simulador EOR", layout="wide")
-st.title("Simulador de Análisis de Imagen: Inyección de Polímeros")
+st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
+st.title("Evaluación de Micromodelos de Desplazamiento EOR: Tortuosidad y Velocidad de Polímeros")
 st.markdown("---")
 
 # --- 1. CARGA DE IMAGEN Y LECTURA DE DATOS ---
@@ -42,16 +42,16 @@ concentracion = st.sidebar.number_input("Concentración (ppm)", value=val_ppm)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Datos Físicos del Modelo")
-ancho = st.sidebar.number_input("Ancho del modelo (cm)", value=5.0)
+ancho = st.sidebar.number_input("Ancho del modelo (cm)", value=5.00)
 longitud = st.sidebar.number_input("Longitud del modelo (cm)", value=5.0)
-espesor = st.sidebar.number_input("Espesor (cm)", value=0.1)
+espesor_mm = st.sidebar.number_input("Espesor (mm)", value=0.08, format="%.3f")
+espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de área
 
 tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
                                   ("Ingreso Manual", "Calcular ópticamente desde la imagen"))
 
 if tipo_porosidad == "Ingreso Manual":
-    porosidad = st.sidebar.number_input("Porosidad (fracción)", min_value=0.01, max_value=1.0, value=0.40)
-    pixeles_vacios = None
+    porosidad = st.sidebar.number_input("Porosidad (fracción)", min_value=0.01, max_value=1.0, value=0.39)
 else:
     st.sidebar.success("La porosidad se calculará automáticamente con el Método de Otsu.")
     porosidad = None 
@@ -90,9 +90,9 @@ if archivo_subido is not None:
     mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     
     bool_mask = mask_limpia > 0
-    esqueleto = skeletonize(bool_mask)
+    esqueleto = skeletonize(bool_mask) 
     
-    # --- Cálculos Geométricos y Cinemáticos ---
+    # Cálculos Geométricos y Cinemáticos
     longitud_camino_pixeles = np.sum(esqueleto)
     longitud_recta_pixeles = img.shape[1] 
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
@@ -134,7 +134,7 @@ if archivo_subido is not None:
     col_c.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
     
     st.markdown("---")
-    tab1, tab2, tab3 = st.tabs(["Original", "Binarización (Matriz)", "Esqueleto (Red de Canales)"])
+    tab1, tab2, tab3 = st.tabs(["MICROMODELO", "BINERIZACIÓN ", "ESQUELOTO (Red de Canales)"])
     
     with tab1: 
         st.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), use_container_width=True)
@@ -142,8 +142,12 @@ if archivo_subido is not None:
         st.image(mask_limpia, use_container_width=True, clamp=True)
     with tab3: 
         esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
-        esqueleto_color[esqueleto] = [0, 255, 0] 
+        esqueleto_color[esqueleto] = [255, 255, 0] 
         st.image(esqueleto_color, use_container_width=True, clamp=True)
+        kernel_visual = np.ones((3,3), np.uint8)
+        esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1) #ENGROSA EL ESQUELETO VISUALMENTE
+
+        st.image(esqueleto_grueso,use_container_width=True, clamp= True)
 
     # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
     st.markdown("---")
