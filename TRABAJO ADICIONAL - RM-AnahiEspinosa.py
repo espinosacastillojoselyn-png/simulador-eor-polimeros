@@ -42,10 +42,10 @@ concentracion = st.sidebar.number_input("Concentración (ppm)", value=val_ppm)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Datos Físicos del Modelo")
-ancho = st.sidebar.number_input("Ancho del modelo (cm)", value=5.00)
-longitud = st.sidebar.number_input("Longitud del modelo (cm)", value=5.0)
+ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
+ancho= ancho_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
 espesor_mm = st.sidebar.number_input("Espesor (mm)", value=0.08, format="%.3f")
-espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de área
+espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
 
 tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
                                   ("Ingreso Manual", "Calcular ópticamente desde la imagen"))
@@ -103,10 +103,12 @@ if archivo_subido is not None:
     v_intersticial = v_darcy / porosidad
     velocidad_real = v_intersticial * tortuosidad
 
-    # --- NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA ---
+    #  NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA 
     pixeles_polimero = np.sum(mask_limpia == 255)
     fraccion_modelo_invadida = pixeles_polimero / pixeles_totales
-    area_total_vista_superior = ancho * longitud
+    longitud_calculada = ancho * (img.shape[1] / img.shape[0])
+    area_total_vista_superior = ancho * longitud_calculada
+    area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior
     area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior
     
     # Eficiencia de barrido areal (EA) respecto al espacio poroso disponible
@@ -143,7 +145,7 @@ if archivo_subido is not None:
     with tab3: 
         esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
         esqueleto_color[esqueleto] = [255, 255, 0] 
-        st.image(esqueleto_color, use_container_width=True, clamp=True)
+        st.image(esqueleto_grueso, use_container_width=True, clamp=True)
         kernel_visual = np.ones((3,3), np.uint8)
         esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1) #ENGROSA EL ESQUELETO VISUALMENTE
 
