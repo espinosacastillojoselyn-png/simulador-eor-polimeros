@@ -136,7 +136,7 @@ if archivo_subido is not None:
     col_c.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
     
     st.markdown("---")
-    tab1, tab2, tab3 = st.tabs(["MICROMODELO", "BINERIZACIÓN ", "ESQUELOTO (Red de Canales)"])
+    tab1, tab2, tab3 = st.tabs(["MICROMODELO", "BINERIZACIÓN ", "ESQUELETO (Red de Canales)"])
     
     with tab1: 
         st.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), use_container_width=True)
@@ -145,11 +145,9 @@ if archivo_subido is not None:
     with tab3: 
         esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
         esqueleto_color[esqueleto] = [255, 255, 0] 
-        st.image(esqueleto_grueso, use_container_width=True, clamp=True)
         kernel_visual = np.ones((3,3), np.uint8)
         esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1) #ENGROSA EL ESQUELETO VISUALMENTE
-
-        st.image(esqueleto_grueso,use_container_width=True, clamp= True)
+        st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
     # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
     st.markdown("---")
