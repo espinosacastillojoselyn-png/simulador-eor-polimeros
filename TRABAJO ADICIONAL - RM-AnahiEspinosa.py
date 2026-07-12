@@ -148,15 +148,14 @@ if archivo_subido is not None:
         esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1) #ENGROSA EL ESQUELETO VISUALMENTE
         st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
-    # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
-    st.markdown("---")
-    st.subheader(f"Resultados del {tipo_polimero}")
-    
-    st.info(f"""
-    st.info(f"""
-    **Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
+   # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
+st.markdown("---")
+st.subheader(f"💡 Resultados del {tipo_polimero}")
 
-    * **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
+st.info(f"""
+**Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
 
-    * **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
-     """)
+* **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
+
+* **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
+""")
