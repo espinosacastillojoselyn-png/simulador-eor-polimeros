@@ -142,6 +142,28 @@ if archivo_subido is not None:
     # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b, col_c = st.columns(3)
+    # Fila 3: Propiedades Microscópicas (Trabajo Adicional)
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_k, col_vacia1, col_vacia2 = st.columns(3)
+
+    # 1. Preparación de la variable matemática
+    # Convertimos el tamaño de grano de mm a cm (utilizando el dato de 0.03 mm de tu tutor)
+    Dp_cm = 0.03 / 10.0  
+
+    # 2. Cálculo de Permeabilidad (Carman-Kozeny)
+    if porosidad > 0 and tortuosidad > 0:
+     # Cálculo en cm²
+      k_cm2 = (porosidad**3 * Dp_cm**2) / (72 * tortuosidad * (1 - porosidad)**2)
+     # Conversión de cm² a miliDarcys (mD) -> Factor: 1.013e11
+      permeabilidad_mD = k_cm2 * 1.013e11 
+   else:
+      permeabilidad_mD = 0.0
+
+    # 3. Impresión en la Interfaz con LaTeX
+    with col_k:
+     st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
+     st.latex(r"k = \frac{\phi^3 \cdot D_p^2}{72 \cdot \tau \cdot (1-\phi)^2}")
+    
 
     with col_a:
      st.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
