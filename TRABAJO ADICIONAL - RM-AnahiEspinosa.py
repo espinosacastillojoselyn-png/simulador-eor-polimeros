@@ -146,7 +146,7 @@ if archivo_subido is not None:
     with col_a:
      st.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
      # Ecuación del área de la fotografía
-     st.latex(r"A_{T} = w \cdot L")
+     st.latex(r"A_{T} = ancho \cdot Longitud")
 
     with col_b:
      st.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
