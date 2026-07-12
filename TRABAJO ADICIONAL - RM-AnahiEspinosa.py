@@ -202,10 +202,10 @@ st.markdown("---")
 st.subheader(f"💡 Resultados del {tipo_polimero}")
 
 st.info(f"""
-        # Resumen Tabla
+# --- Resumen Tabular para Copiar y Pegar ---
 st.markdown("### 📋 Resumen de Datos Obtenidos")
 
-# Organizamos los datos en un diccionario
+# Organizamos los datos asegurando que ambas listas tengan exactamente 10 elementos separados por comas
 datos_resumen = {
     "Parámetro": [
         "Fluido Inyectado",
@@ -220,8 +220,8 @@ datos_resumen = {
         "Permeabilidad Estimada (mD)"
     ],
     "Valor": [
-        tipo_polimero,
-        concentracion,
+        f"{tipo_polimero}",
+        f"{concentracion}",
         f"{porosidad * 100:.2f}",
         "0.03",
         f"{tortuosidad:.4f}",
