@@ -44,7 +44,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Datos Físicos del Modelo")
 ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
 ancho= ancho_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
-espesor_mm = st.sidebar.number_input("Espesor (mm)", value=0.08, format="%.3f")
+espesor_mm = st.sidebar.number_input("Espesor del Micromodelo (mm)", value=0.08, format="%.3f")
 espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
 
 tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
@@ -119,20 +119,45 @@ if archivo_subido is not None:
     # --- 4. PANEL DE RESULTADOS Y VISUALIZACIÓN ---
     st.markdown("---")
     st.subheader("📊 Resultados del Análisis")
-    
+
     # Fila 1: Parámetros Hidrodinámicos de los Canales
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm") 
-    col2.metric("Porosidad Óptica", f"{porosidad:.2%}")
-    col3.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
-    col4.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
-    
+
+    with col1:
+     st.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm")
+
+    with col2:
+     st.metric("Porosidad", f"{porosidad:.2%}")
+
+    with col3:
+     st.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
+     # Ecuación de la tortuosidad (Longitud efectiva / Longitud recta)
+     st.latex(r"\tau = \frac{L_e}{L_r}")
+
+    with col4:
+     st.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
+     # Ecuación de la velocidad real (Velocidad intersticial * tortuosidad)
+     st.latex(r"v_{real} = \frac{q}{A \cdot \phi} \cdot \tau")
+
     # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
-    col_b.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
-    col_c.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
+
+    with col_a:
+     st.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
+     # Ecuación del área de la fotografía
+     st.latex(r"A_{T} = w \cdot L")
+
+    with col_b:
+     st.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
+     # Ecuación de los píxeles convertidos a área
+     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_p}{Pixeles_T}\right)")
+
+    with col_c:
+     st.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
+     # Ecuación de la eficiencia de barrido
+     st.latex(r"E_A = \frac{A_{B}}{A_{T}} \times 100")
+     
     
     st.markdown("---")
     tab1, tab2, tab3 = st.tabs(["MICROMODELO", "BINERIZACIÓN ", "ESQUELETO (Red de Canales)"])
