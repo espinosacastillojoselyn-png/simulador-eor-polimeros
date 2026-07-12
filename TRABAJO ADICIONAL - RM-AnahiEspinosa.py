@@ -202,10 +202,16 @@ st.markdown("---")
 st.subheader(f"💡 Resultados del {tipo_polimero}")
 
 st.info(f""""
-# --- Resumen Tabular para Copiar y Pegar ---
+**Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
+
+* **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
+
+* **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
+""")
+# --- 6. RESUMEN TABULAR Y EXPORTACIÓN ---
 st.markdown("### 📋 Resumen de Datos Obtenidos")
 
-# Organizamos los datos asegurando que ambas listas tengan exactamente 10 elementos separados por comas
+# Organizamos los datos asegurando que ambas listas tengan exactamente 10 elementos
 datos_resumen = {
     "Parámetro": [
         "Fluido Inyectado",
@@ -218,7 +224,7 @@ datos_resumen = {
         "Área Real Barrida (cm²)",
         "Eficiencia de Barrido Areal (EA %)",
         "Permeabilidad Estimada (mD)"
-    ]
+    ],
     "Valor": [
         f"{tipo_polimero}",
         f"{concentracion}",
@@ -233,13 +239,18 @@ datos_resumen = {
     ]
 }
 
-# Convertimos el diccionario en una tabla de Pandas y la mostramos
+# Convertimos el diccionario en una tabla y la mostramos en pantalla
 df_resumen = pd.DataFrame(datos_resumen)
 st.table(df_resumen)
 
-**Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
+# Creamos el archivo Excel en memoria temporal para el botón de descarga
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+    df_resumen.to_excel(writer, index=False, sheet_name='Resultados_EOR')
 
-* **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
-
-* **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
-""")
+st.download_button(
+    label="📊 Descargar Resultados en Excel",
+    data=buffer.getvalue(),
+    file_name=f"Reporte_Micromodelo_{tipo_polimero}_{concentracion}ppm.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
