@@ -156,7 +156,7 @@ if archivo_subido is not None:
       k_cm2 = (porosidad**3 * Dp_cm**2) / (72 * tortuosidad * (1 - porosidad)**2)
      # Conversión de cm² a miliDarcys (mD) -> Factor: 1.013e11
       permeabilidad_mD = k_cm2 * 1.013e11 
-   else:
+    else:
       permeabilidad_mD = 0.0
 
     # 3. Impresión en la Interfaz con LaTeX
