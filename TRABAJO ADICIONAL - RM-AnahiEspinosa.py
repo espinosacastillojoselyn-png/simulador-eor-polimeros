@@ -151,7 +151,7 @@ if archivo_subido is not None:
     with col_b:
      st.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
      # Ecuación de los píxeles convertidos a área
-     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_polímero}{Pixeles_Totales}\right)")
+     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_{polímero}}{Pixeles_{Totales}}\right)")
 
     with col_c:
      st.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
