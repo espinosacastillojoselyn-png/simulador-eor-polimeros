@@ -201,7 +201,7 @@ if archivo_subido is not None:
 st.markdown("---")
 st.subheader(f"💡 Resultados del {tipo_polimero}")
 
-st.info(f"""
+st.info(f""""
 # --- Resumen Tabular para Copiar y Pegar ---
 st.markdown("### 📋 Resumen de Datos Obtenidos")
 
