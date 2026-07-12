@@ -46,6 +46,8 @@ ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
 ancho= ancho_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
 espesor_mm = st.sidebar.number_input("Espesor del Micromodelo (mm)", value=0.08, format="%.3f")
 espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálculo de Área
+Dp_cm= st.sidebar.number_input("Tamaño del Grano (mm)", value=0.03, format="%.3f")
+Dp_cm = 0.03 / 10.0  #Tamaño de grano
 
 tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
                                   ("Ingreso Manual", "Calcular ópticamente desde la imagen"))
