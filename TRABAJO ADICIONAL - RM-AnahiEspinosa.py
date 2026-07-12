@@ -137,7 +137,7 @@ if archivo_subido is not None:
     with col4:
      st.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
      # Ecuación de la velocidad real (Velocidad intersticial * tortuosidad)
-     st.latex(r"v_{real} = \frac{q}{A \cdot \phi} \cdot \tau")
+     st.latex(r"v_{real} = \frac{q}{A_Transversal \cdot \phi} \cdot \tau")
 
     # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
@@ -151,7 +151,7 @@ if archivo_subido is not None:
     with col_b:
      st.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
      # Ecuación de los píxeles convertidos a área
-     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_p}{Pixeles_T}\right)")
+     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_polímero}{Pixeles_Totales}\right)")
 
     with col_c:
      st.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
