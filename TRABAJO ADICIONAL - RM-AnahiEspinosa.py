@@ -137,7 +137,7 @@ if archivo_subido is not None:
     with col4:
      st.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
      # Ecuación de la velocidad real (Velocidad intersticial * tortuosidad)
-     st.latex(r"v_{real} = \frac{q}{A_Transversal \cdot \phi} \cdot \tau")
+     st.latex(r"v_{real} = \frac{q}{A_{Transversal} \cdot \phi} \cdot \tau")
 
     # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
