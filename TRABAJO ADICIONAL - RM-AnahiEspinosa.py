@@ -1,6 +1,8 @@
 import streamlit as st
 import cv2
 import numpy as np
+import pandas as pd
+import io
 from skimage.morphology import skeletonize
 import re 
 
