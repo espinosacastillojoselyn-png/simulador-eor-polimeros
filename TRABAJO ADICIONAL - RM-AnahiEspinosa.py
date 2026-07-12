@@ -202,6 +202,41 @@ st.markdown("---")
 st.subheader(f"💡 Resultados del {tipo_polimero}")
 
 st.info(f"""
+        # Resumen Tabla
+st.markdown("### 📋 Resumen de Datos Obtenidos")
+
+# Organizamos los datos en un diccionario
+datos_resumen = {
+    "Parámetro": [
+        "Fluido Inyectado",
+        "Concentración (ppm)",
+        "Porosidad Absoluta (%)",
+        "Tamaño de Grano Estimado (mm)",
+        "Tortuosidad Areal (τ)",
+        "Velocidad del Polímero Inyectado (cm/s)",
+        "Área Total del Modelo (cm²)",
+        "Área Real Barrida (cm²)",
+        "Eficiencia de Barrido Areal (EA %)",
+        "Permeabilidad Estimada (mD)"
+    ],
+    "Valor": [
+        tipo_polimero,
+        concentracion,
+        f"{porosidad * 100:.2f}",
+        "0.03",
+        f"{tortuosidad:.4f}",
+        f"{velocidad_real:.6f}",
+        f"{area_total_vista_superior:.4f}",
+        f"{area_barrida_cm2:.4f}",
+        f"{eficiencia_barrido * 100:.2f}",
+        f"{permeabilidad_mD:.2f}"
+    ]
+}
+
+# Convertimos el diccionario en una tabla de Pandas y la mostramos
+df_resumen = pd.DataFrame(datos_resumen)
+st.table(df_resumen)
+
 **Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
 
 * **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
