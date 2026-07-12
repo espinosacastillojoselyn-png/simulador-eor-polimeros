@@ -218,7 +218,7 @@ datos_resumen = {
         "Área Real Barrida (cm²)",
         "Eficiencia de Barrido Areal (EA %)",
         "Permeabilidad Estimada (mD)"
-    ],
+    ]
     "Valor": [
         f"{tipo_polimero}",
         f"{concentracion}",
