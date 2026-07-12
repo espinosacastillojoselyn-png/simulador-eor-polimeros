@@ -99,17 +99,16 @@ if archivo_subido is not None:
     
     q_cm3_s = caudal / 60.0
     area_transversal_cm2 = ancho * espesor
-    v_darcy = q_cm3_s / area_transversal_cm2
-    v_intersticial = v_darcy / porosidad
-    velocidad_real = v_intersticial * tortuosidad
+    v_darcy = q_cm3_s / area_transversal_cm2 #Velocidad de Darcy
+    v_intersticial = v_darcy / porosidad #Velocidad Intersticial 
+    velocidad_real = v_intersticial * tortuosidad 
 
     #  NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA 
     pixeles_polimero = np.sum(mask_limpia == 255)
-    fraccion_modelo_invadida = pixeles_polimero / pixeles_totales
+    fraccion_modelo_invadida = pixeles_polimero / pixeles_totales #Cálculo de Eficiencia Areal
     longitud_calculada = ancho * (img.shape[1] / img.shape[0])
     area_total_vista_superior = ancho * longitud_calculada
-    area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior
-    area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior
+    area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior    
     
     # Eficiencia de barrido areal (EA) respecto al espacio poroso disponible
     if pixeles_vacios and pixeles_vacios > 0:
@@ -126,7 +125,7 @@ if archivo_subido is not None:
     col1.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm") 
     col2.metric("Porosidad Óptica", f"{porosidad:.2%}")
     col3.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
-    col4.metric("Velocidad Canal", f"{velocidad_real:.6f} cm/s")
+    col4.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
     
     # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
@@ -151,18 +150,8 @@ if archivo_subido is not None:
 
     # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
     st.markdown("---")
-    st.subheader(f"💡 Resultados de {tipo_polimero}")
+    st.subheader(f" Resultados del {tipo_polimero}")
     
-    if tortuosidad > 8.0:
-        comportamiento_red = "alta ramificación (amplia red de canales interconectados)."
-        eficiencia_txt = "una mejora significativa en la eficiencia de barrido areal"
-    elif tortuosidad > 3.0:
-        comportamiento_red = "ramificación moderada."
-        eficiencia_txt = "un barrido areal estándar con cierta mitigación de la canalización"
-    else:
-        comportamiento_red = "una ruta preferencial muy directa."
-        eficiencia_txt = "una posible ruptura temprana (breakthrough) por digitación viscosa"
-
     st.info(f"""
     **Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
     
