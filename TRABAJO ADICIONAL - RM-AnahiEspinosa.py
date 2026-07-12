@@ -150,12 +150,13 @@ if archivo_subido is not None:
 
     # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
     st.markdown("---")
-    st.subheader(f" Resultados del {tipo_polimero}")
+    st.subheader(f"Resultados del {tipo_polimero}")
     
     st.info(f"""
+    st.info(f"""
     **Análisis de la inyección de {tipo_polimero} a {concentracion} ppm:**
-    
-    * **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica {comportamiento_red} Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando {eficiencia_txt} frente al agua de formación. El sistema ha alcanzado una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso.
-    
-    * **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad interstitial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
-    """)
+
+    * **Comportamiento Areal y Eficiencia:** El valor de tortuosidad de **{tortuosidad:.2f}** indica el grado de ramificación de la red de canales. Al contrastar distintos fluidos, este parámetro revela que el **{tipo_polimero}** inyectado está logrando una **Eficiencia de Barrido Areal ($E_A$) del {eficiencia_barrido:.2%}**, ocupando un área neta de **{area_barrida_cm2:.4f} cm²** dentro del medio poroso. Un valor de tortuosidad alto sugiere una dispersión más amplia y una mejor mitigación de la canalización.
+
+    * **Cinemática del Frente:** La velocidad real en el canal preferencial es de **{velocidad_real:.6f} cm/s**. Controlar esta velocidad intersticial es vital para dar tiempo a que los mecanismos físico-químicos del **{tipo_polimero}** actúen sobre el crudo residual en los poros, sin exceder el gradiente de fractura de la matriz rocosa.
+     """)
