@@ -275,9 +275,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Convertimos el diccionario en una tabla y la mostramos en pantalla
-df_resumen = pd.DataFrame(datos_resumen)
-st.table(df_resumen)
+
 
 # PODEMOS EXPORTAR LOS RESULTADOS EN UN ARCHIVO EXCEL
 buffer = io.BytesIO()
