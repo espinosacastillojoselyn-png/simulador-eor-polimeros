@@ -245,7 +245,41 @@ datos_resumen = {
 df_resumen = pd.DataFrame(datos_resumen)
 st.table(df_resumen)
 
-# Creamos el archivo Excel en memoria temporal para el botón de descarga
+st.markdown("""
+<style>
+/* Eliminar bordes externos de la tabla */
+[data-testid="stTable"] table {
+    border: none !important;
+    border-collapse: collapse !important;
+}
+/* Estilo del encabezado (Mayúsculas, negrita y solo línea inferior) */
+[data-testid="stTable"] th {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 2px solid #2C3E50 !important;
+    text-transform: uppercase !important;
+    font-weight: 700 !important;
+    color: #2C3E50 !important;
+    padding-bottom: 12px !important;
+}
+/* Estilo de las filas (Sin bordes laterales, solo línea divisoria suave) */
+[data-testid="stTable"] td {
+    border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: 1px solid #E0E0E0 !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Convertimos el diccionario en una tabla y la mostramos en pantalla
+df_resumen = pd.DataFrame(datos_resumen)
+st.table(df_resumen)
+
+# PODEMOS EXPORTAR LOS RESULTADOS EN UN ARCHIVO EXCEL
 buffer = io.BytesIO()
 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
     df_resumen.to_excel(writer, index=False, sheet_name='Resultados_EOR')
