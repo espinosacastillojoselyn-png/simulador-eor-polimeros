@@ -72,7 +72,7 @@ else:
 if archivo_subido is not None:
     # Decodificar imagen subida
     file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
-    img_original = cv2.imdecode(file_bytes, 1)
+    img = cv2.imdecode(file_bytes, 1)
     
     pixeles_totales = img.shape[0] * img.shape[1] #Área total del micromodelo (toda la imagen)
 
