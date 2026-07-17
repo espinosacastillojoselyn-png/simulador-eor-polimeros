@@ -72,7 +72,7 @@ else:
 if archivo_subido is not None:
     # Decodificar imagen subida
     file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, 1)
+    img_original = cv2.imdecode(file_bytes, 1)
     # A. Balance de Blancos: Algoritmo Gray World
     B, G, R = cv2.split(img_original)
     mB, mG, mR = np.mean(B), np.mean(G), np.mean(R)
