@@ -14,9 +14,9 @@ st.markdown("---")
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
 try:
     # Carga la imagen local de waterflooding
-    st.image("Iny Water.jpeg", caption="Micromodelo – Inyección de Agua", use_container_width=True)
+st.image("Iny Water.jpeg", caption="Micromodelo - Inyección de Agua", use_container_width=True)
 except Exception as e:
-    st.error("⚠️ No se encontró la imagen 'Iny Water.jpeg'. Asegúrate de que esté en la misma carpeta que el script.")
+    st.error("⚠️ No se encontró la imagen 'Iny Water.jpg'. Asegúrate de que esté en la misma carpeta que el script.")
 st.markdown("---")
 #  1. CARGA DE IMAGEN Y LECTURA DE DATOS 
 st.subheader("🖼️ 1. Carga tu Micromodelo")
