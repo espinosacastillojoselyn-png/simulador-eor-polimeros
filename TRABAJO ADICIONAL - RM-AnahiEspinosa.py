@@ -58,15 +58,8 @@ espesor = espesor_mm / 10.0 #Conversión del valor de espesor mm a cm para cálc
 Dp_cm= st.sidebar.number_input("Tamaño del Grano (mm)", value=0.03, format="%.3f")
 Dp_cm = 0.03 / 10.0  #Tamaño de grano
 
-tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?", 
-                                  ("Ingreso Manual", "Calcular ópticamente desde la imagen"))
-
-if tipo_porosidad == "Ingreso Manual":
-    porosidad = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
-else:
-    st.sidebar.success("La porosidad se calculará automáticamente con el Método de Otsu.")
-    porosidad = None 
-    pixeles_vacios = None
+# Ingreso manual estricto de la Porosidad Absoluta
+porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
 
 # 3. PROCESAMIENTO RBG Y CÁLCULOS MATEMÁTICOS
 if archivo_subido is not None:
@@ -81,23 +74,22 @@ if archivo_subido is not None:
     #img.shape [0] alto total de la imagen en píxeles.
     # img.shape [1] ancho total de la imagen en píxeles.
     
-    #  Cálculo de Porosidad Dinámica (Otsu) 
-    if porosidad is None or tipo_porosidad == "Calcular ópticamente desde la imagen":
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        umbral_optimo, mascara_poros = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        
-        pixeles_vacios = np.sum(mascara_poros == 255)
-        porosidad = pixeles_vacios / pixeles_totales #Ecuación de Porosidad Efectiva
-        
-        if porosidad == 0:
-            porosidad = 0.001
-            
-        st.sidebar.info(f"Umbral automático (Otsu) calculado: {umbral_optimo:.0f}")
+    # Cálculo de Porosidad Efectiva (Otsu)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    umbral_optimo, mascara_poros = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    pixeles_vacios = np.sum(mascara_poros == 255)
+    porosidad_otsu = pixeles_vacios / pixeles_totales 
+    
+    # Restricción Petrofísica: La Efectiva NUNCA puede ser mayor a la Absoluta
+    if porosidad_otsu >= porosidad_abs:
+        porosidad_efectiva = porosidad_abs * 0.95 # Factor de seguridad del 95% de la absoluta
+        st.sidebar.warning(f"⚠️ Otsu sobrestimó la porosidad ({porosidad_otsu:.2%}). Se ajustó a {porosidad_efectiva:.2%} (Efectiva < Absoluta).")
     else:
-        # Si es manual, estimamos los píxeles vacíos teóricos del espacio poroso
-        pixeles_vacios = int(pixeles_totales * porosidad)
+        porosidad_efectiva = porosidad_otsu
+        st.sidebar.success(f"✔️ Porosidad Efectiva (Otsu): {porosidad_efectiva:.2%}")
 
-    # Aislamiento del Polímero y Esqueletización 
+    # --- Aislamiento del Polímero y Esqueletización ---
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     lower_blue = np.array([100, 50, 50])
     upper_blue = np.array([140, 255, 255])
@@ -109,17 +101,17 @@ if archivo_subido is not None:
     bool_mask = mask_limpia > 0
     esqueleto = skeletonize(bool_mask) 
     
-    # Cálculos Geométricos y Cinemáticos
+    # --- Cálculos Geométricos y Cinemáticos ---
     longitud_camino_pixeles = np.sum(esqueleto) #Le
     longitud_recta_pixeles = img.shape[1] #Lr
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
-
-    #Cálculo de Velocidad
-    q_cm3_s = caudal / 60.0 #Conversión de ml/min a cm^3/s
+    
+    # Cálculo de Velocidad (Actualizado con Porosidad Efectiva)
+    q_cm3_s = caudal / 60.0 # Conversión de ml/min a cm^3/s
     area_transversal_cm2 = ancho * espesor
-    v_darcy = q_cm3_s / area_transversal_cm2 #Velocidad de Darcy
-    v_intersticial = v_darcy / porosidad #Velocidad Intersticial 
-    velocidad_real = v_intersticial * tortuosidad 
+    v_darcy = q_cm3_s / area_transversal_cm2 # Velocidad de Darcy
+    v_intersticial = v_darcy / porosidad_efectiva # VELOCIDAD INTERSTICIAL REAL 
+    velocidad_real = v_intersticial * tortuosidad
 
     #  NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA 
     pixeles_polimero = np.sum(mask_limpia == 255)
