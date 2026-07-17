@@ -183,13 +183,13 @@ if archivo_subido is not None:
     Dp_cm = 0.03 / 10.0  
 
     # 2. Cálculo de Permeabilidad (Carman-Kozeny)
-    if porosidad > 0 and tortuosidad > 0:
-     # Cálculo en cm²
-      k_cm2 = (porosidad**3 * Dp_cm**2) / (72 * tortuosidad * (1 - porosidad)**2)
-     # Conversión de cm² a miliDarcys (mD) -> Factor: 1.013e11
-      permeabilidad_mD = k_cm2 * 1.013e11 
+    if porosidad_efectiva > 0 and tortuosidad > 0:
+        # Cálculo en cm2 (Usando 32 para granos cilíndricos transversales y porosidad efectiva)
+        k_cm2 = (porosidad_efectiva**3 * Dp_cm**2) / (32 * tortuosidad * (1 - porosidad_efectiva)**2)
+        # Conversión de cm2 a miliDarcys (mD) -> Factor: 1.013e11
+        permeabilidad_mD = k_cm2 * 1.013e11 
     else:
-      permeabilidad_mD = 0.0
+        permeabilidad_mD = 0.0
 
     # 3. Impresión en la Interfaz con LaTeX
     with col_k:
