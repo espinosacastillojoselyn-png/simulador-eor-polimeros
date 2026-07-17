@@ -4,14 +4,21 @@ import numpy as np
 import pandas as pd
 import io
 from skimage.morphology import skeletonize
+from skimage import measure
 import re 
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
 st.title("Evaluación de Micromodelos de Desplazamiento EOR: Tortuosidad y Velocidad de Polímeros")
 st.markdown("---")
-
-# --- 1. CARGA DE IMAGEN Y LECTURA DE DATOS ---
+st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
+try:
+    # Carga la imagen local de waterflooding
+    st.image("Iny Water.jpeg", caption="Micromodelo – Inyección de Agua", use_container_width=True)
+except Exception as e:
+    st.error("⚠️ No se encontró la imagen 'Iny Water.jpeg'. Asegúrate de que esté en la misma carpeta que el script.")
+st.markdown("---")
+#  1. CARGA DE IMAGEN Y LECTURA DE DATOS 
 st.subheader("🖼️ 1. Carga tu Micromodelo")
 archivo_subido = st.file_uploader("Selecciona o arrastra una imagen JPG/PNG", type=['jpg', 'jpeg', 'png'])
 
@@ -36,7 +43,7 @@ if archivo_subido is not None:
     if match_ppm:
         val_ppm = int(match_ppm.group(1))
 
-# --- 2. INGRESO DE PARÁMETROS EN BARRA LATERAL ---
+# 2. INGRESO DE PARÁMETROS
 st.sidebar.header("📝 2. Parámetros del Experimento")
 st.sidebar.text_input("Polímero Detectado", value=tipo_polimero, disabled=True)
 caudal = st.sidebar.number_input("Caudal de Inyección (ml/min)", value=val_q, format="%.4f")
@@ -55,26 +62,31 @@ tipo_porosidad = st.sidebar.radio("¿Cómo ingresar la porosidad?",
                                   ("Ingreso Manual", "Calcular ópticamente desde la imagen"))
 
 if tipo_porosidad == "Ingreso Manual":
-    porosidad = st.sidebar.number_input("Porosidad (fracción)", min_value=0.01, max_value=1.0, value=0.39)
+    porosidad = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
 else:
     st.sidebar.success("La porosidad se calculará automáticamente con el Método de Otsu.")
     porosidad = None 
     pixeles_vacios = None
 
-# --- 3. PROCESAMIENTO VISUAL Y CÁLCULOS MATEMÁTICOS ---
+# 3. PROCESAMIENTO RBG Y CÁLCULOS MATEMÁTICOS
 if archivo_subido is not None:
     # Decodificar imagen subida
     file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
     img = cv2.imdecode(file_bytes, 1)
-    pixeles_totales = img.shape[0] * img.shape[1]
+    pixeles_totales = img.shape[0] * img.shape[1] #Área total del micromodelo (toda la imagen)
+
+    #Dimensionalidad de píxeles
+    # pixeles_totales volumen bulk
+    #img.shape [0] alto total de la imagen en píxeles.
+    # img.shape [1] ancho total de la imagen en píxeles.
     
-    # --- Cálculo de Porosidad Dinámica (Otsu) ---
+    #  Cálculo de Porosidad Dinámica (Otsu) 
     if porosidad is None or tipo_porosidad == "Calcular ópticamente desde la imagen":
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         umbral_optimo, mascara_poros = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
         pixeles_vacios = np.sum(mascara_poros == 255)
-        porosidad = pixeles_vacios / pixeles_totales
+        porosidad = pixeles_vacios / pixeles_totales #Ecuación de Porosidad Efectiva
         
         if porosidad == 0:
             porosidad = 0.001
@@ -84,7 +96,7 @@ if archivo_subido is not None:
         # Si es manual, estimamos los píxeles vacíos teóricos del espacio poroso
         pixeles_vacios = int(pixeles_totales * porosidad)
 
-    # --- Aislamiento del Polímero y Esqueletización ---
+    # Aislamiento del Polímero y Esqueletización 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     lower_blue = np.array([100, 50, 50])
     upper_blue = np.array([140, 255, 255])
@@ -97,11 +109,12 @@ if archivo_subido is not None:
     esqueleto = skeletonize(bool_mask) 
     
     # Cálculos Geométricos y Cinemáticos
-    longitud_camino_pixeles = np.sum(esqueleto)
-    longitud_recta_pixeles = img.shape[1] 
+    longitud_camino_pixeles = np.sum(esqueleto) #Le
+    longitud_recta_pixeles = img.shape[1] #Lr
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
-    
-    q_cm3_s = caudal / 60.0
+
+    #Cálculo de Velocidad
+    q_cm3_s = caudal / 60.0 #Conversión de ml/min a cm^3/s
     area_transversal_cm2 = ancho * espesor
     v_darcy = q_cm3_s / area_transversal_cm2 #Velocidad de Darcy
     v_intersticial = v_darcy / porosidad #Velocidad Intersticial 
@@ -119,6 +132,28 @@ if archivo_subido is not None:
         eficiencia_barrido = min(1.0, pixeles_polimero / pixeles_vacios)
     else:
         eficiencia_barrido = 0.0
+    #Visualización en Columnas
+    st.markdown("---")
+    st.subheader(f"🔬 Visualización: Inyección de {tipo_polimero}")
+    
+    col_img1, col_img2, col_img3 = st.columns(3)
+    
+    with col_img1:
+        st.markdown("**Tipo de Polímero:**")
+        st.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), use_container_width=True)
+        
+    with col_img2:
+        st.markdown("**Binarización**")
+        st.image(mask_limpia, use_container_width=True, clamp=True)
+        
+    with col_img3:
+        st.markdown("**Esqueleto (Red de Canales)**")
+        # Preparación del esqueleto visual
+        esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
+        esqueleto_color[esqueleto] = [255, 255, 0] 
+        kernel_visual = np.ones((3,3), np.uint8)
+        esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1)
+        st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
     # --- 4. PANEL DE RESULTADOS Y VISUALIZACIÓN ---
     st.markdown("---")
@@ -183,22 +218,7 @@ if archivo_subido is not None:
      st.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
      # Ecuación de la eficiencia de barrido
      st.latex(r"E_A = \frac{A_{B}}{A_{T}} \times 100")
-     
-    
-    st.markdown("---")
-    tab1, tab2, tab3 = st.tabs(["MICROMODELO", "BINERIZACIÓN ", "ESQUELETO (Red de Canales)"])
-    
-    with tab1: 
-        st.image(cv2.cvtColor(img, cv2.COLOR_BGR2RGB), use_container_width=True)
-    with tab2: 
-        st.image(mask_limpia, use_container_width=True, clamp=True)
-    with tab3: 
-        esqueleto_color = np.zeros((esqueleto.shape[0], esqueleto.shape[1], 3), dtype=np.uint8)
-        esqueleto_color[esqueleto] = [255, 255, 0] 
-        kernel_visual = np.ones((3,3), np.uint8)
-        esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1) #ENGROSA EL ESQUELETO VISUALMENTE
-        st.image(esqueleto_grueso, use_container_width=True, clamp=True)
-
+   
    # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
 st.markdown("---")
 st.subheader(f"💡 Resultados del {tipo_polimero}")
