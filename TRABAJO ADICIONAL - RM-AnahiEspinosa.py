@@ -72,7 +72,29 @@ else:
 if archivo_subido is not None:
     # Decodificar imagen subida
     file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, 1)
+    file_bytes = np.asarray(bytearray(archivo_subido.read()), dtype=np.uint8)
+    
+    # --- AQUÍ EMPIEZA EL REEMPLAZO DE TU ANTIGUA LÍNEA 75 ---
+    img_original = cv2.imdecode(file_bytes, 1)
+
+    # A. Balance de Blancos: Algoritmo Gray World
+    B, G, R = cv2.split(img_original)
+    mB, mG, mR = np.mean(B), np.mean(G), np.mean(R)
+    mean_gray = (mB + mG + mR) / 3.0
+    
+    B_gw = np.clip((B * (mean_gray / mB)), 0, 255).astype(np.uint8)
+    G_gw = np.clip((G * (mean_gray / mG)), 0, 255).astype(np.uint8)
+    R_gw = np.clip((R * (mean_gray / mR)), 0, 255).astype(np.uint8)
+    img_gw = cv2.merge([B_gw, G_gw, R_gw])
+
+    # B. Corrección de Iluminación: Pseudo Flat-Field Correction
+    fondo_iluminacion = cv2.GaussianBlur(img_gw, (151, 151), 0)
+    img_flat = img_gw.astype(np.float32) / (fondo_iluminacion.astype(np.float32) + 1e-5) 
+    img_flat = cv2.normalize(img_flat, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+    # C. Resolución y formato (Usando una resolución alta para no perder detalles de los poros)
+    img = cv2.resize(img_flat, (1024, 1024), interpolation=cv2.INTER_LINEAR)
+
     pixeles_totales = img.shape[0] * img.shape[1] #Área total del micromodelo (toda la imagen)
 
     #Dimensionalidad de píxeles
