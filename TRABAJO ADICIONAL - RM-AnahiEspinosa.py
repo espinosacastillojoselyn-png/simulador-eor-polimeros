@@ -159,7 +159,7 @@ if archivo_subido is not None:
      st.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm")
 
     with col2:
-     st.metric("Porosidad", f"{porosidad:.2%}")
+     st.metric("Porosidad (Abs / Efectiva)", f"{porosidad_abs:.0%} / {porosidad_efectiva:.1%}")
 
     with col3:
      st.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
