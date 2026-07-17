@@ -194,7 +194,7 @@ if archivo_subido is not None:
     # 3. Impresión en la Interfaz con LaTeX
     with col_k:
      st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
-     st.latex(r"k = \frac{\phi^3 \cdot D_p^2}{72 \cdot \tau \cdot (1-\phi)^2}")
+     st.latex(r"k = \frac{\phi_{eff}^3 \cdot D_p^2}{32 \cdot \tau \cdot (1-\phi_{eff})^2}")
     
 
     with col_a:
