@@ -243,7 +243,7 @@ datos_resumen = {
     "Valor": [
         f"{tipo_polimero}",
         f"{concentracion}",
-        f"{porosidad * 100:.2f}",
+        f"{porosidad_abs * 100:.2f}",
         "0.03",
         f"{tortuosidad:.4f}",
         f"{velocidad_real:.6f}",
