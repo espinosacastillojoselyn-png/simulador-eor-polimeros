@@ -201,7 +201,7 @@ if archivo_subido is not None:
     with col_c:
         st.markdown("**Eficiencia de Barrido Areal (EA)**")
         st.latex(r"E_A = \frac{A_B}{A_T} \times 100")
-        st.latex(rf"E_A = {eficiencia_barrido:.2\%}")
+       st.latex(rf"E_A = {eficiencia_barrido * 100:.2f} \%")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
