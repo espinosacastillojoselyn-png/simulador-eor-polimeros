@@ -177,10 +177,14 @@ if archivo_subido is not None:
     # Convertimos el tamaño de grano de mm a cm (utilizando el dato de 0.03 mm de tu tutor)
     Dp_cm = 0.03 / 10.0  
 
-    # 2. Cálculo de Permeabilidad (Carman-Kozeny)
+    # 2. Cálculo de Permeabilidad (Kozeny-Carman Modificado para Micromodelos 2D)
     if porosidad_efectiva > 0 and tortuosidad > 0:
-        # Cálculo en cm2 (Usando 32 para granos cilíndricos transversales y porosidad efectiva)
-        k_cm2 = (porosidad_efectiva**3 * Dp_cm**2) / (32 * tortuosidad * (1 - porosidad_efectiva)**2)
+        # Cálculo del Área Superficial Específica (Placas + Cilindros)
+        S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
+        
+        # Cálculo de permeabilidad en cm2 (Constante de forma de poro c=2)
+        k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
+        
         # Conversión de cm2 a miliDarcys (mD) -> Factor: 1.013e11
         permeabilidad_mD = k_cm2 * 1.013e11 
     else:
@@ -188,8 +192,9 @@ if archivo_subido is not None:
 
     # 3. Impresión en la Interfaz con LaTeX
     with col_k:
-     st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
-     st.latex(r"k = \frac{\phi_{eff}^3 \cdot D_p^2}{32 \cdot \tau \cdot (1-\phi_{eff})^2}")
+        st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
+        st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
+        st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
     
 
     with col_a:
