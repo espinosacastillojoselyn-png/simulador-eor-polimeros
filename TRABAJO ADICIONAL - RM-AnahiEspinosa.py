@@ -143,74 +143,87 @@ if archivo_subido is not None:
         esqueleto_grueso = cv2.dilate(esqueleto_color, kernel_visual, iterations=1)
         st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
-    # --- 4. PANEL DE RESULTADOS Y VISUALIZACIÓN ---
+# --- 4. PANEL DE RESULTADOS (FORMATO DE PUBLICACIÓN CIENTÍFICA) ---
     st.markdown("---")
-    st.subheader("📊 Resultados del Análisis")
+    st.subheader("📊 Resultados del Análisis Petrofísico")
 
-    # Fila 1: Parámetros Hidrodinámicos de los Canales
-    col1, col2, col3, col4 = st.columns(4)
-
+    # === BLOQUE 1: Datos Base y Porosidad ===
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
-     st.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm")
-
+        st.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm")
+        
     with col2:
-     st.metric("Porosidad (Abs / Efectiva)", f"{porosidad_abs:.0%} / {porosidad_efectiva:.1%}")
-
+        st.metric("Porosidad (Abs / Efectiva)", f"{porosidad_abs:.0%} / {porosidad_efectiva:.1%}")
+        # Ecuación de la porosidad efectiva solicitada
+        st.latex(r"\phi_{eff} = \frac{Píxeles_{polímero}}{Píxeles_{Totales}}")
+        
     with col3:
-     st.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
-     # Ecuación de la tortuosidad (Longitud efectiva / Longitud recta)
-     st.latex(r"\tau = \frac{L_e}{L_r}")
+        st.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
+        st.latex(r"\tau = \frac{L_e}{L_r}")
 
-    with col4:
-     st.metric("Velocidad del Polímero Inyectado", f"{velocidad_real:.6f} cm/s")
-     # Ecuación de la velocidad real (Velocidad intersticial * tortuosidad)
-     st.latex(r"v_{real} = \frac{q}{A_{Transversal} \cdot \phi} \cdot \tau")
-
-    # Fila 2: Cuantificación de Áreas Sólidas y Eficiencia de Barrido
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # === BLOQUE 2: Cinemática del Fluido ===
+    st.markdown("#### 🔹 Cinemática del Fluido (Velocidades)")
+    col_v1, col_v2 = st.columns([1.5, 1])
+    
+    with col_v1:
+        st.metric("Velocidad Real del Polímero", f"{velocidad_real:.6f} cm/s")
+        st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{eff}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
+        
+    with col_v2:
+        # Explicación de variables exclusiva para la velocidad
+        st.markdown("""
+        **Donde:**
+        *   $q$: Caudal de inyección ($cm^3/s$).
+        *   $A_{transversal}$: Área de la sección ($ancho \times espesor$).
+        *   $\phi_{eff}$: Porosidad efectiva (fracción).
+        *   $\tau$: Tortuosidad areal (adimensional).
+        """)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # === BLOQUE 3: Eficiencia y Geometría de Barrido ===
+    st.markdown("#### 🔹 Eficiencia de Barrido y Geometría")
     col_a, col_b, col_c = st.columns(3)
-    # Fila 3: Propiedades Microscópicas (Trabajo Adicional)
+    
+    with col_a:
+        st.markdown("**Área Total (Vista Superior)**")
+        st.latex(r"A_T = ancho \cdot Longitud")
+        st.latex(rf"A_T = {area_total_vista_superior:.4f} \text{{ cm}}^2")
+        
+    with col_b:
+        st.markdown("**Área Real Barrida**")
+        st.latex(r"A_B = A_T \cdot \left(\frac{Píxeles_{polímero}}{Píxeles_{Totales}}\right)")
+        st.latex(rf"A_B = {area_barrida_cm2:.4f} \text{{ cm}}^2")
+        
+    with col_c:
+        st.markdown("**Eficiencia de Barrido Areal (EA)**")
+        st.latex(r"E_A = \frac{A_B}{A_T} \times 100")
+        st.latex(rf"E_A = {eficiencia_barrido:.2\%}")
+
     st.markdown("<br>", unsafe_allow_html=True)
-    col_k, col_vacia1, col_vacia2 = st.columns(3)
 
-    # 1. Preparación de la variable matemática
-    # Convertimos el tamaño de grano de mm a cm (utilizando el dato de 0.03 mm de tu tutor)
-    Dp_cm = 0.03 / 10.0  
-
-    # 2. Cálculo de Permeabilidad (Kozeny-Carman Modificado para Micromodelos 2D)
+    # === BLOQUE 4: Permeabilidad Dinámica ===
+    st.markdown("#### 🔹 Propiedades Petrofísicas Modificadas")
+    
+    # Cálculos Matemáticos de Permeabilidad (Kozeny-Carman Modificado)
+    Dp_cm = 0.03 / 10.0
     if porosidad_efectiva > 0 and tortuosidad > 0:
-        # Cálculo del Área Superficial Específica (Placas + Cilindros)
         S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
-        
-        # Cálculo de permeabilidad en cm2 (Constante de forma de poro c=2)
         k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
-        
-        # Conversión de cm2 a miliDarcys (mD) -> Factor: 1.013e11
         permeabilidad_mD = k_cm2 * 1.013e11 
     else:
         permeabilidad_mD = 0.0
 
-    # 3. Impresión en la Interfaz con LaTeX
+    # Impresión en Interfaz
+    col_k, col_vacia = st.columns([1.5, 1])
+    
     with col_k:
         st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
         st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
         st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
-    
-
-    with col_a:
-     st.metric("Área Total (Vista Superior)", f"{area_total_vista_superior:.2f} cm²")
-     # Ecuación del área de la fotografía
-     st.latex(r"A_{T} = ancho \cdot Longitud")
-
-    with col_b:
-     st.metric("Área Real Barrida", f"{area_barrida_cm2:.4f} cm²")
-     # Ecuación de los píxeles convertidos a área
-     st.latex(r"A_{B} = A_{T} \cdot \left(\frac{Pixeles_{polímero}}{Pixeles_{Totales}}\right)")
-
-    with col_c:
-     st.metric("Eficiencia de Barrido Areal (EA)", f"{eficiencia_barrido:.2%}")
-     # Ecuación de la eficiencia de barrido
-     st.latex(r"E_A = \frac{A_{B}}{A_{T}} \times 100")
    
    # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
 st.markdown("---")
