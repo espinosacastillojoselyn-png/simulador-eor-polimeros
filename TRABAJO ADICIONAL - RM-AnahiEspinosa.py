@@ -152,15 +152,17 @@ if archivo_subido is not None:
     
     with col1:
         st.metric("Fluido Inyectado", f"{tipo_polimero} {concentracion} ppm")
+        st.metric("Porosidad Absoluta", f"{porosidad_abs:.0%}")
         
     with col2:
-        st.metric("Porosidad (Abs / Efectiva)", f"{porosidad_abs:.0%} / {porosidad_efectiva:.1%}")
-        # Ecuación de la porosidad efectiva solicitada
+        st.markdown("**Porosidad Efectiva**")
         st.latex(r"\phi_{eff} = \frac{Píxeles_{polímero}}{Píxeles_{Totales}}")
+        st.latex(rf"\phi_{{eff}} = {porosidad_efectiva * 100:.1f} \%")
         
     with col3:
-        st.metric("Tortuosidad Areal (τ)", f"{tortuosidad:.4f}")
+        st.markdown("**Tortuosidad Areal (τ)**")
         st.latex(r"\tau = \frac{L_e}{L_r}")
+        st.latex(rf"\tau = {tortuosidad:.4f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -169,15 +171,15 @@ if archivo_subido is not None:
     col_v1, col_v2 = st.columns([1.5, 1])
     
     with col_v1:
-        st.metric("Velocidad Real del Polímero", f"{velocidad_real:.6f} cm/s")
+        st.markdown("**Velocidad Real del Polímero**")
         st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{eff}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
+        st.latex(rf"v_{{real}} = {velocidad_real:.6f} \text{{ cm/s}}")
         
     with col_v2:
-        # Explicación de variables exclusiva para la velocidad
-        st.markdown("""
+        st.markdown(r"""
         **Donde:**
-        *   $q$: Caudal de inyección ($cm^3/s$).
-        *   $A_{transversal}$: Área de la sección ($ancho \times espesor$).
+        *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
+        *   $A_{transversal}$: Área de la sección transversal ($ancho \times espesor$).
         *   $\phi_{eff}$: Porosidad efectiva (fracción).
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
@@ -218,12 +220,23 @@ if archivo_subido is not None:
         permeabilidad_mD = 0.0
 
     # Impresión en Interfaz
-    col_k, col_vacia = st.columns([1.5, 1])
+    col_k1, col_k2 = st.columns([1.5, 1])
     
-    with col_k:
-        st.metric("Permeabilidad Estimada (k)", f"{permeabilidad_mD:.2f} mD")
+    with col_k1:
+        st.markdown("**Permeabilidad Estimada - Modelo de Kozeny-Carman Modificado**")
         st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
         st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
+        st.latex(rf"k = {permeabilidad_mD:.2f} \text{{ mD}}")
+        
+    with col_k2:
+        st.markdown(r"""
+        **Donde:**
+        *   $S_{vp}$: Área superficial específica ($\text{cm}^{-1}$).
+        *   $h$: Espesor del micromodelo ($\text{cm}$).
+        *   $\phi_{eff}$: Porosidad efectiva (fracción).
+        *   $D_p$: Diámetro del grano cilíndrico ($\text{cm}$).
+        *   $\tau$: Tortuosidad areal (adimensional).
+        """)
    
    # --- 5. INTERPRETACIÓN TÉCNICA DINÁMICA ---
 st.markdown("---")
