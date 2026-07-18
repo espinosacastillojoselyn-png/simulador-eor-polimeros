@@ -74,22 +74,7 @@ if archivo_subido is not None:
     #img.shape [0] alto total de la imagen en píxeles.
     # img.shape [1] ancho total de la imagen en píxeles.
     
-    # Cálculo de Porosidad Efectiva (Otsu)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    umbral_optimo, mascara_poros = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    pixeles_vacios = np.sum(mascara_poros == 255)
-    porosidad_otsu = pixeles_vacios / pixeles_totales 
-    
-    # Restricción Petrofísica: La Efectiva NUNCA puede ser mayor a la Absoluta
-    if porosidad_otsu >= porosidad_abs:
-        porosidad_efectiva = porosidad_abs * 0.95 # Factor de seguridad del 95% de la absoluta
-        st.sidebar.warning(f"⚠️ Otsu sobrestimó la porosidad ({porosidad_otsu:.2%}). Se ajustó a {porosidad_efectiva:.2%} (Efectiva < Absoluta).")
-    else:
-        porosidad_efectiva = porosidad_otsu
-        st.sidebar.success(f"✔️ Porosidad Efectiva (Otsu): {porosidad_efectiva:.2%}")
-
-    # --- Aislamiento del Polímero y Esqueletización ---
+   #Aislamiento del Polímero (Flujo Interconectado) 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     lower_blue = np.array([100, 50, 50])
     upper_blue = np.array([140, 255, 255])
@@ -98,33 +83,43 @@ if archivo_subido is not None:
     kernel = np.ones((5,5), np.uint8)
     mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     
+    # Cálculo Manual de Porosidad Efectiva (Ecuación Tradicional en Píxeles)
+    # Los píxeles del polímero representan los poros interconectados activos (Vpi)
+    pixeles_polimero = np.sum(mask_limpia == 255)
+    
+    # Ecuación: Porosidad Efectiva = Vpi / Vt
+    porosidad_efectiva = pixeles_polimero / pixeles_totales 
+    
+    # Restricción Petrofísica Lógica
+    if porosidad_efectiva >= porosidad_abs:
+        porosidad_efectiva = porosidad_abs * 0.95
+        
+    st.sidebar.success(f"✔️ Porosidad Efectiva: {porosidad_efectiva:.2%}")
+
+    #Esqueletización y Cinemática
     bool_mask = mask_limpia > 0
     esqueleto = skeletonize(bool_mask) 
     
-    # --- Cálculos Geométricos y Cinemáticos ---
-    longitud_camino_pixeles = np.sum(esqueleto) #Le
-    longitud_recta_pixeles = img.shape[1] #Lr
+    longitud_camino_pixeles = np.sum(esqueleto) # Le
+    longitud_recta_pixeles = img.shape[1] # Lr
     tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
     
-    # Cálculo de Velocidad (Actualizado con Porosidad Efectiva)
+    # Cálculo de Velocidad Real
     q_cm3_s = caudal / 60.0 # Conversión de ml/min a cm^3/s
     area_transversal_cm2 = ancho * espesor
     v_darcy = q_cm3_s / area_transversal_cm2 # Velocidad de Darcy
-    v_intersticial = v_darcy / porosidad_efectiva # VELOCIDAD INTERSTICIAL REAL 
-    velocidad_real = v_intersticial * tortuosidad
-
-    #  NUEVOS CÁLCULOS: ÁREA REAL BARRIDA Y EFICIENCIA 
-    pixeles_polimero = np.sum(mask_limpia == 255)
-    fraccion_modelo_invadida = pixeles_polimero / pixeles_totales #Cálculo de Eficiencia Areal
+    v_intersticial = v_darcy / porosidad_efectiva # Velocidad Intersticial usando porosidad dinámica
+    velocidad_real = v_intersticial * tortuosidad 
+    
+    # Áreas y Eficiencia
+    fraccion_modelo_invadida = porosidad_efectiva # En 2D, la fracción invadida es equivalente a la porosidad efectiva
     longitud_calculada = ancho * (img.shape[1] / img.shape[0])
     area_total_vista_superior = ancho * longitud_calculada
     area_barrida_cm2 = fraccion_modelo_invadida * area_total_vista_superior    
     
-    # Eficiencia de barrido areal (EA) respecto al espacio poroso disponible
-    if pixeles_vacios and pixeles_vacios > 0:
-        eficiencia_barrido = min(1.0, pixeles_polimero / pixeles_vacios)
-    else:
-        eficiencia_barrido = 0.0
+    # Eficiencia de barrido areal (EA) respecto al volumen poroso disponible (Absoluto)
+    eficiencia_barrido = min(1.0, porosidad_efectiva / porosidad_abs)
+
     #Visualización en Columnas
     st.markdown("---")
     st.subheader(f"🔬 Visualización: Inyección de {tipo_polimero}")
