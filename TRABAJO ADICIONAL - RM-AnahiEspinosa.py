@@ -20,12 +20,12 @@ except Exception as e:
 st.markdown("---")
 
 # --- 1. CARGA DE IMAGEN MÚLTIPLE (BATCH PROCESSING) ---
-st.subheader("🖼️ 1. Carga tus Micromodelos (Procesamiento Automático por Lotes)")
+st.subheader("🖼️ 1. Carga tus Micromodelos ")
 # accept_multiple_files=True permite subir todas las imágenes de la carpeta a la vez
 archivos_subidos = st.file_uploader("Selecciona múltiples imágenes JPG/PNG", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
 # --- 2. INGRESO DE PARÁMETROS GLOBALES ---
-st.sidebar.header("📝 2. Parámetros Físicos Constantes")
+st.sidebar.header("📝 2. Parámetros Físicos")
 st.sidebar.info("El polímero, concentración y caudal se extraerán automáticamente de los nombres de los archivos.")
 
 ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
@@ -141,7 +141,7 @@ if archivos_subidos:
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
     st.markdown("---")
-    st.subheader("📋 Resumen Consolidado de la Corrida")
+    st.subheader("📋 RESUMEN RESULTADOS")
     df_maestro = pd.DataFrame(datos_consolidados)
     
     st.markdown("""
@@ -167,7 +167,7 @@ if archivos_subidos:
 
     # --- 5. INSPECCIÓN VISUAL INDIVIDUAL ---
     st.markdown("---")
-    st.subheader("🔍 Inspección Visual Detallada")
+    st.subheader("🔍 MICROMODELO")
     st.info("Selecciona un micromodelo específico del lote para visualizar sus máscaras y el análisis científico detallado.")
     
     nombres_archivos = [f.name for f in archivos_subidos]
@@ -208,7 +208,7 @@ if archivos_subidos:
 
     # --- 6. PANEL DE RESULTADOS CIENTÍFICO (SOLO PARA LA IMAGEN SELECCIONADA) ---
     st.markdown("---")
-    st.subheader(f"📊 Análisis Petrofísico: {archivo_seleccionado}")
+    st.subheader(f"📊 CÁLCULOS DE: {archivo_seleccionado}")
 
     col1, col2, col3 = st.columns(3)
     with col1:
