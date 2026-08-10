@@ -13,7 +13,6 @@ st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
 try:
-    # Carga la imagen local de waterflooding
     st.image("Iny Water.jpeg", caption="Micromodelo - Inyección de Agua", use_container_width=True)
 except Exception as e:
     st.error("⚠️ No se encontró la imagen 'Iny Water.jpeg'. Asegúrate de que esté en la misma carpeta que el script.")
@@ -21,7 +20,6 @@ st.markdown("---")
 
 # --- 1. CARGA DE IMAGEN MÚLTIPLE (BATCH PROCESSING) ---
 st.subheader("🖼️ 1. Carga tus Micromodelos ")
-# accept_multiple_files=True permite subir todas las imágenes de la carpeta a la vez
 archivos_subidos = st.file_uploader("Selecciona múltiples imágenes JPG/PNG", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
 # --- 2. INGRESO DE PARÁMETROS GLOBALES ---
@@ -35,13 +33,12 @@ espesor = espesor_mm / 10.0 # cm
 Dp_cm_input = st.sidebar.number_input("Tamaño del Grano (mm)", value=0.03, format="%.3f")
 Dp_cm = Dp_cm_input / 10.0 # cm
 porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
-# NUEVO PARÁMETRO: Tiempo de Irrupción
-t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650)
+
+t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
 st.sidebar.success("🤖 Calibración Óptica Automatizada Activada. El algoritmo aislará el volumen de polímero mediante análisis HSV y limpieza morfológica.")
 
-# Lista para almacenar los resultados consolidados
 datos_consolidados = []
 
 # --- 3. PROCESAMIENTO EN BUCLE (MATEMÁTICAS EN SEGUNDO PLANO) ---
@@ -49,7 +46,6 @@ if archivos_subidos:
     for archivo in archivos_subidos:
         nombre_archivo = archivo.name
         
-        # Extracción automática vía Regex para esta imagen específica
         tipo_polimero = "Desconocido"
         val_q = 0.036
         val_ppm = 200
@@ -66,37 +62,27 @@ if archivos_subidos:
         if match_ppm:
             val_ppm = int(match_ppm.group(1))
 
-        # Decodificación
         file_bytes = np.asarray(bytearray(archivo.read()), dtype=np.uint8)
         img = cv2.imdecode(file_bytes, 1)
         pixeles_totales = img.shape[0] * img.shape[1] 
         
-        # --- Aislamiento del Polímero (100% Automático) ---
-        # 1. Filtro de suavizado para homogenizar reflejos del vidrio
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        # 2. Rango de color azul estandarizado (cubre desde celestes hasta azules profundos)
         lower_blue = np.array([90, 40, 40])
         upper_blue = np.array([150, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
         
-        # 3. Limpieza Morfológica Autónoma
         kernel = np.ones((5,5), np.uint8)
-        # MORPH_OPEN: Elimina los falsos positivos (sombras grises o ruido de granos)
         mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        # MORPH_CLOSE: Rellena los huecos vacíos dentro de los canales de polímero
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
-        # Cálculos de Porosidad
         pixeles_polimero = np.sum(mask_limpia == 255)
         porosidad_efectiva = pixeles_polimero / pixeles_totales 
         
-        # Restricción Petrofísica
         if porosidad_efectiva >= porosidad_abs:
             porosidad_efectiva = porosidad_abs * 0.95
             
-        # Esqueletización y Tortuosidad
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
         
@@ -104,7 +90,6 @@ if archivos_subidos:
         longitud_recta_pixeles = img.shape[1] 
         tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
         
-        # Cinemática y Eficiencia
         q_cm3_s = val_q / 60.0 
         area_transversal_cm2 = ancho * espesor
         v_darcy = q_cm3_s / area_transversal_cm2
@@ -116,7 +101,6 @@ if archivos_subidos:
         area_barrida_cm2 = porosidad_efectiva * area_total_vista_superior    
         eficiencia_barrido = min(1.0, porosidad_efectiva / porosidad_abs) if porosidad_abs > 0 else 0
 
-        # Kozeny-Carman Modificado
         if porosidad_efectiva > 0 and tortuosidad > 0:
             S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
             k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
@@ -124,13 +108,19 @@ if archivos_subidos:
         else:
             permeabilidad_mD = 0.0
 
-        # --- NUEVOS CÁLCULOS: Np y VPI al Breakthrough ---
-        Vp_cm3 = area_total_vista_superior * espesor * porosidad_abs
-        Np_cm3 = area_barrida_cm2 * espesor * porosidad_abs
-        V_iny_cm3 = val_q * t_bt
-        VPI_bt = V_iny_cm3 / Vp_cm3 if Vp_cm3 > 0 else 0
+        # --- NUEVOS CÁLCULOS VOLUMÉTRICOS EN MILÍMETROS CÚBICOS (mm³) ---
+        # 1 cm = 10 mm  |  1 cm² = 100 mm²  |  1 cm³ = 1000 mm³
+        largo_mm = ancho_mm * (img.shape[1] / img.shape[0])
+        area_total_mm2 = ancho_mm * largo_mm
+        area_barrida_mm2 = porosidad_efectiva * area_total_mm2
+        
+        Vp_mm3 = area_total_mm2 * espesor_mm * porosidad_abs
+        Np_mm3 = area_barrida_mm2 * espesor_mm * porosidad_abs
+        
+        # Caudal (val_q) está en ml/min. 1 ml = 1000 mm³.
+        V_iny_mm3 = val_q * 1000 * t_bt
+        VPI_bt = V_iny_mm3 / Vp_mm3 if Vp_mm3 > 0 else 0
 
-        # Guardar en la tabla maestra
         datos_consolidados.append({
             "Archivo": nombre_archivo,
             "Polímero": tipo_polimero,
@@ -142,11 +132,10 @@ if archivos_subidos:
             "Área Barrida (cm²)": area_barrida_cm2,
             "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
             "Permeabilidad Mod. (mD)": permeabilidad_mD,
-            "Np al BT (cm³)": Np_cm3,
+            "Np al BT (mm³)": Np_mm3,
             "VPI al BT": VPI_bt
         })
         
-        # Resetear el archivo en memoria para poder visualizarlo después
         archivo.seek(0)
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
@@ -183,16 +172,13 @@ if archivos_subidos:
     nombres_archivos = [f.name for f in archivos_subidos]
     archivo_seleccionado = st.selectbox("Seleccionar Micromodelo:", nombres_archivos)
     
-    # Extraer los datos guardados en el DataFrame para evitar recalcular matemáticamente todo
     datos_fila = df_maestro[df_maestro["Archivo"] == archivo_seleccionado].iloc[0]
     
-    # Recuperar el archivo de imagen para dibujar la UI
     archivo_obj = next(f for f in archivos_subidos if f.name == archivo_seleccionado)
     archivo_obj.seek(0)
     file_bytes_ui = np.asarray(bytearray(archivo_obj.read()), dtype=np.uint8)
     img_ui = cv2.imdecode(file_bytes_ui, 1)
     
-    # Re-aplicar solo los filtros visuales para dibujar las columnas
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
     hsv_ui = cv2.cvtColor(img_suavizada_ui, cv2.COLOR_BGR2HSV)
     mask_ui = cv2.inRange(hsv_ui, np.array([90, 40, 40]), np.array([150, 255, 255]))
@@ -201,7 +187,6 @@ if archivos_subidos:
     mask_limpia_ui = cv2.morphologyEx(mask_limpia_ui, cv2.MORPH_CLOSE, kernel_ui)
     esqueleto_ui = skeletonize(mask_limpia_ui > 0)
 
-    # Visualización en Columnas
     col_img1, col_img2, col_img3 = st.columns(3)
     with col_img1:
         st.markdown(f"**Original: {datos_fila['Polímero']}**")
@@ -216,7 +201,7 @@ if archivos_subidos:
         esqueleto_grueso = cv2.dilate(esqueleto_color, np.ones((3,3), np.uint8), iterations=1)
         st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
-    # --- 6. PANEL DE RESULTADOS CIENTÍFICO (SOLO PARA LA IMAGEN SELECCIONADA) ---
+    # --- 6. PANEL DE RESULTADOS CIENTÍFICO ---
     st.markdown("---")
     st.subheader(f"📊 CÁLCULOS DE: {archivo_seleccionado}")
 
@@ -244,7 +229,7 @@ if archivos_subidos:
         st.markdown(r"""
         **Donde:**
         *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
-        *   $A_{transversal}$: Área de la sección transversal ($ancho \times espesor$).
+        *   $A_{transversal}$: Área transversal ($ancho \times espesor$).
         *   $\phi_{eff}$: Porosidad efectiva (fracción).
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
@@ -287,44 +272,49 @@ if archivos_subidos:
     
     with col_eq1:
         st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
-        st.write("El Petróleo Recuperado ($N_p$) calculado en función del crecimiento del área barrida asumiendo $S_{oi} = 1$:")
+        st.write("Cálculo volumétrico en milímetros cúbicos (mm³) asumiendo $S_{oi} = 1$:")
         st.latex(r"N_p(t) = A_B(t) \cdot h \cdot \phi_{abs} \cdot S_{oi}")
         st.markdown(r"""
         **Donde:**
-        *   $A_B(t)$: Área barrida por el polímero en el tiempo $t$ ($\text{cm}^2$).
-        *   $h$: Espesor del modelo ($\text{cm}$).
+        *   $A_B(t)$: Área barrida en el tiempo $t$ ($\text{mm}^2$).
+        *   $h$: Espesor del modelo ($\text{mm}$).
         *   $\phi_{abs}$: Porosidad absoluta (fracción).
         """)
         
     with col_eq2:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.write("Los Volúmenes Porosos Inyectados (VPI) normalizan el volumen de inyección respecto a la capacidad de la matriz:")
-        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{A_T \cdot h \cdot \phi_{abs}}")
+        st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico ($1 \text{ ml} = 1000 \text{ mm}^3$):")
+        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{(q \cdot 1000) \cdot t}{V_p}")
         st.markdown(r"""
         **Donde:**
-        *   $q$: Caudal de inyección ($\text{cm}^3\text{/min}$).
-        *   $t$: Tiempo de inyección transcurrido ($\text{min}$).
-        *   $V_p$: Volumen poroso total del micromodelo ($\text{cm}^3$).
-        *   $A_T$: Área total de la vista superior ($\text{cm}^2$).
+        *   $q$: Caudal de inyección ($\text{ml/min}$).
+        *   $t$: Tiempo transcurrido ($\text{min}$).
+        *   $V_p$: Volumen poroso total ($\text{mm}^3$).
         """)
 
-    # --- 8. GRÁFICAS DE COMPORTAMIENTO DINÁMICO (PROYECCIÓN AL BT) ---
+    # --- 8. GRÁFICAS DE COMPORTAMIENTO DINÁMICO (REALISTA) ---
     st.markdown("---")
-    st.subheader(f"📈 Proyección Dinámica al Breakthrough: {archivo_seleccionado}")
-    st.write("Representación del comportamiento de recobro asumiendo un avance lineal hasta la irrupción.")
+    st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
+    st.write("Las gráficas utilizan intervalos discretos de 10 minutos e incorporan un factor de atenuación para simular la pérdida de eficiencia por digitación viscosa.")
     
-    # Extraer valores finales para este modelo
-    Np_final = datos_fila['Np al BT (cm³)']
+    Np_final = datos_fila['Np al BT (mm³)']
     VPI_final = datos_fila['VPI al BT']
     
-    # Crear un DataFrame sintético para la gráfica (10 puntos desde t=0 hasta t=t_bt)
-    tiempos = np.linspace(0, t_bt, 10)
+    # 1. Tiempos exactos en enteros saltando de 10 en 10
+    tiempos = np.arange(0, int(t_bt) + 10, 10)
+    
+    # 2. Curva realista (Exponente 0.85 para simular atenuación no lineal)
+    np_array = Np_final * ((tiempos / t_bt) ** 0.85)
+    
+    # 3. VPI y Volumen Inyectado crecen de manera constante en el tiempo
+    v_iny_array = (datos_fila['Caudal (ml/min)'] * 1000) * tiempos
+    vpi_array = VPI_final * (tiempos / t_bt)
     
     datos_grafica = pd.DataFrame({
         "Tiempo (min)": tiempos,
-        "Np (cm³)": np.linspace(0, Np_final, 10),
-        "VPI": np.linspace(0, VPI_final, 10),
-        "Volumen Inyectado (cm³)": np.linspace(0, (datos_fila['Caudal (ml/min)'] * t_bt), 10)
+        "Np (mm³)": np_array,
+        "VPI": vpi_array,
+        "Volumen Inyectado (mm³)": v_iny_array
     })
     
     # Dibujar gráficas
@@ -332,12 +322,17 @@ if archivos_subidos:
     
     with col_g1:
         st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
-        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (cm³)", color="#2ECC71")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (mm³)", color="#2ECC71")
         
     with col_g2:
         st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.line_chart(datos_grafica, x="VPI", y="Np (cm³)", color="#3498DB")
+        st.line_chart(datos_grafica, x="VPI", y="Np (mm³)", color="#3498DB")
         
-    # Mostrar la tabla de datos usada para las curvas
-    with st.expander("Ver Tabla de Datos de Producción (Proyectada)"):
-        st.dataframe(datos_grafica, use_container_width=True)
+    with st.expander("Ver Tabla de Datos de Producción Estimada"):
+        # Formatear la tabla para mostrar sin decimales donde no sean necesarios
+        st.dataframe(datos_grafica.style.format({
+            "Tiempo (min)": "{:.0f}",
+            "Np (mm³)": "{:.2f}",
+            "VPI": "{:.4f}",
+            "Volumen Inyectado (mm³)": "{:.0f}"
+        }), use_container_width=True)
