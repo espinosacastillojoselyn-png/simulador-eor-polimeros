@@ -25,7 +25,6 @@ st.write("El sistema está leyendo y procesando automáticamente las imágenes d
 
 CARPETA_MICROMODELOS = "micromodelos"
 
-# Verificamos si la carpeta existe y extraemos las imágenes
 if not os.path.exists(CARPETA_MICROMODELOS):
     st.warning(f"⚠️ No se detectó la carpeta '{CARPETA_MICROMODELOS}'. Por favor, créala en tu repositorio y sube las imágenes.")
     archivos_validos = []
@@ -34,20 +33,20 @@ else:
 
 # --- 2. INGRESO DE PARÁMETROS GLOBALES ---
 st.sidebar.header("📝 2. Parámetros Físicos")
-st.sidebar.info("El polímero, concentración y caudal se extraen automáticamente de los nombres de los archivos.")
+st.sidebar.info("Para replicar la Tesis, usa Ancho = 180 mm y Espesor = 0.8 mm")
 
-ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
+ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=180.00)
 ancho = ancho_mm / 10.0 # cm
-espesor_mm = st.sidebar.number_input("Espesor del Micromodelo (mm)", value=0.08, format="%.3f")
+espesor_mm = st.sidebar.number_input("Espesor del Micromodelo (mm)", value=0.800, format="%.3f")
 espesor = espesor_mm / 10.0 # cm
-Dp_cm_input = st.sidebar.number_input("Tamaño del Grano (mm)", value=0.03, format="%.3f")
+Dp_cm_input = st.sidebar.number_input("Tamaño del Grano (mm)", value=3.00, format="%.3f") 
 Dp_cm = Dp_cm_input / 10.0 # cm
 porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
 
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Calibración Óptica Automatizada Activada. El algoritmo aislará el volumen de polímero mediante análisis HSV y limpieza morfológica.")
+st.sidebar.success("🤖 Calibración Óptica Automatizada Activada.")
 
 datos_consolidados = []
 
@@ -72,7 +71,6 @@ if archivos_validos:
         if match_ppm:
             val_ppm = int(match_ppm.group(1))
 
-        # Lectura directa desde la ruta local usando OpenCV
         img = cv2.imread(ruta_imagen)
         if img is None:
             continue
@@ -121,16 +119,18 @@ if archivos_validos:
         else:
             permeabilidad_mD = 0.0
 
-        # --- NUEVOS CÁLCULOS VOLUMÉTRICOS EN MILÍMETROS CÚBICOS (mm³) ---
-        largo_mm = ancho_mm * (img.shape[1] / img.shape[0])
-        area_total_mm2 = ancho_mm * largo_mm
-        area_barrida_mm2 = porosidad_efectiva * area_total_mm2
+        # --- NUEVOS CÁLCULOS VOLUMÉTRICOS EN MILILITROS (1 cm³ = 1 ml) ---
+        largo_cm = ancho * (img.shape[1] / img.shape[0])
+        area_total_cm2 = ancho * largo_cm
+        area_barrida_cm2 = porosidad_efectiva * area_total_cm2
         
-        Vp_mm3 = area_total_mm2 * espesor_mm * porosidad_abs
-        Np_mm3 = area_barrida_mm2 * espesor_mm * porosidad_abs
+        # Volumen en cm³ (ml)
+        Vp_ml = area_total_cm2 * espesor * porosidad_abs
+        Np_ml = area_barrida_cm2 * espesor * porosidad_abs
         
-        V_iny_mm3 = val_q * 1000 * t_bt
-        VPI_bt = V_iny_mm3 / Vp_mm3 if Vp_mm3 > 0 else 0
+        # Volumen Inyectado al BT en ml
+        V_iny_ml = val_q * t_bt
+        VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -143,7 +143,7 @@ if archivos_validos:
             "Área Barrida (cm²)": area_barrida_cm2,
             "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
             "Permeabilidad Mod. (mD)": permeabilidad_mD,
-            "Np al BT (mm³)": Np_mm3,
+            "Np al BT (ml)": Np_ml,  # <-- Título corregido en la tabla maestra
             "VPI al BT": VPI_bt
         })
 
@@ -182,7 +182,6 @@ if archivos_validos:
     
     datos_fila = df_maestro[df_maestro["Archivo"] == archivo_seleccionado].iloc[0]
     
-    # Lectura directa para la UI
     img_ui = cv2.imread(os.path.join(CARPETA_MICROMODELOS, archivo_seleccionado))
     
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
@@ -278,24 +277,25 @@ if archivos_validos:
     
     with col_eq1:
         st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
-        st.write("Cálculo volumétrico en milímetros cúbicos (mm³) asumiendo $S_{oi} = 1$:")
+        st.write("Cálculo volumétrico en mililitros (ml) asumiendo $S_{oi} = 1$:")
         st.latex(r"N_p(t) = A_B(t) \cdot h \cdot \phi_{abs} \cdot S_{oi}")
         st.markdown(r"""
         **Donde:**
-        *   $A_B(t)$: Área barrida en el tiempo $t$ ($\text{mm}^2$).
-        *   $h$: Espesor del modelo ($\text{mm}$).
+        *   $A_B(t)$: Área barrida en el tiempo $t$ ($\text{cm}^2$).
+        *   $h$: Espesor del modelo ($\text{cm}$).
         *   $\phi_{abs}$: Porosidad absoluta (fracción).
         """)
         
     with col_eq2:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.write(r"Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico ($1 \text{ ml} = 1000 \text{ mm}^3$):")
-        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{(q \cdot 1000) \cdot t}{V_p}")
+        # Se quitó el texto y la ecuación con el factor de 1000
+        st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico:")
+        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
         st.markdown(r"""
         **Donde:**
         *   $q$: Caudal de inyección ($\text{ml/min}$).
         *   $t$: Tiempo transcurrido ($\text{min}$).
-        *   $V_p$: Volumen poroso total ($\text{mm}^3$).
+        *   $V_p$: Volumen poroso total ($\text{ml}$).
         """)
 
     # --- 8. GRÁFICAS DE COMPORTAMIENTO DINÁMICO (REALISTA) ---
@@ -303,45 +303,38 @@ if archivos_validos:
     st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
     st.write("Las gráficas utilizan intervalos discretos de 10 minutos e incorporan un factor de atenuación para simular la pérdida de eficiencia por digitación viscosa.")
     
-    Np_final = datos_fila['Np al BT (mm³)']
+    Np_final = datos_fila['Np al BT (ml)']
     VPI_final = datos_fila['VPI al BT']
     
-    # 1. Tiempos exactos en enteros saltando de 10 en 10
     tiempos = np.arange(0, int(t_bt) + 10, 10)
     
-    # 2. Curva realista (Exponente 0.85 para simular atenuación no lineal)
     np_array = Np_final * ((tiempos / t_bt) ** 0.85)
-    
-    # 3. VPI (Adimensional)
     vpi_array = VPI_final * (tiempos / t_bt)
     
-    # 4. Volumen Inyectado en MILILITROS (ml) - Igual que en la tesis
-    # El caudal (val_q) ya está en ml/min, así que solo multiplicamos por el tiempo.
+    # Volumen inyectado en mililitros (ml)
     v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
     
     datos_grafica = pd.DataFrame({
         "Tiempo (min)": tiempos,
-        "Np (mm³)": np_array,
+        "Np (ml)": np_array,
         "VPI": vpi_array,
         "Volumen Inyectado (ml)": v_iny_ml_array
     })
     
-    # Dibujar gráficas
     col_g1, col_g2 = st.columns(2)
     
     with col_g1:
         st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
-        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (mm³)", color="#2ECC71")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (ml)", color="#2ECC71")
         
     with col_g2:
         st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.line_chart(datos_grafica, x="VPI", y="Np (mm³)", color="#3498DB")
+        st.line_chart(datos_grafica, x="VPI", y="Np (ml)", color="#3498DB")
         
     with st.expander("Ver Tabla de Datos de Producción Estimada"):
-        # Formatear la tabla para que sea idéntica al estándar de la tesis
         st.dataframe(datos_grafica.style.format({
             "Tiempo (min)": "{:.0f}",
-            "Np (mm³)": "{:.2f}",
+            "Np (ml)": "{:.2f}",
             "VPI": "{:.2f}",
             "Volumen Inyectado (ml)": "{:.2f}"
         }), use_container_width=True)
