@@ -289,7 +289,7 @@ if archivos_validos:
         
     with col_eq2:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico ($1 \text{ ml} = 1000 \text{ mm}^3$):")
+        st.write(r"Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico ($1 \text{ ml} = 1000 \text{ mm}^3$):")
         st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{(q \cdot 1000) \cdot t}{V_p}")
         st.markdown(r"""
         **Donde:**
@@ -335,7 +335,7 @@ if archivos_validos:
         st.line_chart(datos_grafica, x="VPI", y="Np (mm³)", color="#3498DB")
         
     with st.expander("Ver Tabla de Datos de Producción Estimada"):
-        # Formatear la tabla para mostrar sin decimales donde no sean necesarios
+        # Formatear la tabla manteniendo VPI en decimal
         st.dataframe(datos_grafica.style.format({
             "Tiempo (min)": "{:.0f}",
             "Np (mm³)": "{:.2f}",
