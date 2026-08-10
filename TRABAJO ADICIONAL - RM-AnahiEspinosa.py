@@ -35,6 +35,8 @@ espesor = espesor_mm / 10.0 # cm
 Dp_cm_input = st.sidebar.number_input("Tamaño del Grano (mm)", value=0.03, format="%.3f")
 Dp_cm = Dp_cm_input / 10.0 # cm
 porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
+# NUEVO PARÁMETRO: Tiempo de Irrupción
+t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650)
 
 st.sidebar.markdown("---")
 st.sidebar.success("🤖 Calibración Óptica Automatizada Activada. El algoritmo aislará el volumen de polímero mediante análisis HSV y limpieza morfológica.")
@@ -122,6 +124,12 @@ if archivos_subidos:
         else:
             permeabilidad_mD = 0.0
 
+        # --- NUEVOS CÁLCULOS: Np y VPI al Breakthrough ---
+        Vp_cm3 = area_total_vista_superior * espesor * porosidad_abs
+        Np_cm3 = area_barrida_cm2 * espesor * porosidad_abs
+        V_iny_cm3 = val_q * t_bt
+        VPI_bt = V_iny_cm3 / Vp_cm3 if Vp_cm3 > 0 else 0
+
         # Guardar en la tabla maestra
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -133,7 +141,9 @@ if archivos_subidos:
             "Velocidad Real (cm/s)": velocidad_real,
             "Área Barrida (cm²)": area_barrida_cm2,
             "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
-            "Permeabilidad Mod. (mD)": permeabilidad_mD
+            "Permeabilidad Mod. (mD)": permeabilidad_mD,
+            "Np al BT (cm³)": Np_cm3,
+            "VPI al BT": VPI_bt
         })
         
         # Resetear el archivo en memoria para poder visualizarlo después
@@ -268,3 +278,66 @@ if archivos_subidos:
         *   $D_p$: Diámetro del grano cilíndrico ($\text{cm}$).
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
+
+    # --- 7. FUNDAMENTO MATEMÁTICO DE LAS CURVAS DINÁMICAS ---
+    st.markdown("---")
+    st.subheader("🔹 Cálculos Volumétricos Dinámicos y de Recobro")
+    
+    col_eq1, col_eq2 = st.columns(2)
+    
+    with col_eq1:
+        st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
+        st.write("El Petróleo Recuperado ($N_p$) calculado en función del crecimiento del área barrida asumiendo $S_{oi} = 1$:")
+        st.latex(r"N_p(t) = A_B(t) \cdot h \cdot \phi_{abs} \cdot S_{oi}")
+        st.markdown(r"""
+        **Donde:**
+        *   $A_B(t)$: Área barrida por el polímero en el tiempo $t$ ($\text{cm}^2$).
+        *   $h$: Espesor del modelo ($\text{cm}$).
+        *   $\phi_{abs}$: Porosidad absoluta (fracción).
+        """)
+        
+    with col_eq2:
+        st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
+        st.write("Los Volúmenes Porosos Inyectados (VPI) normalizan el volumen de inyección respecto a la capacidad de la matriz:")
+        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{A_T \cdot h \cdot \phi_{abs}}")
+        st.markdown(r"""
+        **Donde:**
+        *   $q$: Caudal de inyección ($\text{cm}^3\text{/min}$).
+        *   $t$: Tiempo de inyección transcurrido ($\text{min}$).
+        *   $V_p$: Volumen poroso total del micromodelo ($\text{cm}^3$).
+        *   $A_T$: Área total de la vista superior ($\text{cm}^2$).
+        """)
+
+    # --- 8. GRÁFICAS DE COMPORTAMIENTO DINÁMICO (PROYECCIÓN AL BT) ---
+    st.markdown("---")
+    st.subheader(f"📈 Proyección Dinámica al Breakthrough: {archivo_seleccionado}")
+    st.write("Representación del comportamiento de recobro asumiendo un avance lineal hasta la irrupción.")
+    
+    # Extraer valores finales para este modelo
+    Np_final = datos_fila['Np al BT (cm³)']
+    VPI_final = datos_fila['VPI al BT']
+    
+    # Crear un DataFrame sintético para la gráfica (10 puntos desde t=0 hasta t=t_bt)
+    tiempos = np.linspace(0, t_bt, 10)
+    
+    datos_grafica = pd.DataFrame({
+        "Tiempo (min)": tiempos,
+        "Np (cm³)": np.linspace(0, Np_final, 10),
+        "VPI": np.linspace(0, VPI_final, 10),
+        "Volumen Inyectado (cm³)": np.linspace(0, (datos_fila['Caudal (ml/min)'] * t_bt), 10)
+    })
+    
+    # Dibujar gráficas
+    col_g1, col_g2 = st.columns(2)
+    
+    with col_g1:
+        st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (cm³)", color="#2ECC71")
+        
+    with col_g2:
+        st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
+        st.line_chart(datos_grafica, x="VPI", y="Np (cm³)", color="#3498DB")
+        
+    # Mostrar la tabla de datos usada para las curvas
+    with st.expander("Ver Tabla de Datos de Producción (Proyectada)"):
+        st.dataframe(datos_grafica, use_container_width=True)
