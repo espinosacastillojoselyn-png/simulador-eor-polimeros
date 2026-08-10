@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import io
+import os
 from skimage.morphology import skeletonize
 import re 
 
@@ -15,16 +16,25 @@ st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Break
 try:
     st.image("Iny Water.jpeg", caption="Micromodelo - Inyección de Agua", use_container_width=True)
 except Exception as e:
-    st.error("⚠️ No se encontró la imagen 'Iny Water.jpeg'. Asegúrate de que esté en la misma carpeta que el script.")
+    st.error("⚠️ No se encontró la imagen 'Iny Water.jpeg'. Asegúrate de que esté en el repositorio.")
 st.markdown("---")
 
-# --- 1. CARGA DE IMAGEN MÚLTIPLE (BATCH PROCESSING) ---
-st.subheader("🖼️ 1. Carga tus Micromodelos ")
-archivos_subidos = st.file_uploader("Selecciona múltiples imágenes JPG/PNG", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
+# --- 1. LECTURA AUTOMÁTICA DE LA CARPETA ---
+st.subheader("🖼️ 1. Procesamiento Automático de Micromodelos")
+st.write("El sistema está leyendo y procesando automáticamente las imágenes desde la base de datos del proyecto.")
+
+CARPETA_MICROMODELOS = "micromodelos"
+
+# Verificamos si la carpeta existe y extraemos las imágenes
+if not os.path.exists(CARPETA_MICROMODELOS):
+    st.warning(f"⚠️ No se detectó la carpeta '{CARPETA_MICROMODELOS}'. Por favor, créala en tu repositorio y sube las imágenes.")
+    archivos_validos = []
+else:
+    archivos_validos = [f for f in os.listdir(CARPETA_MICROMODELOS) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
 # --- 2. INGRESO DE PARÁMETROS GLOBALES ---
 st.sidebar.header("📝 2. Parámetros Físicos")
-st.sidebar.info("El polímero, concentración y caudal se extraerán automáticamente de los nombres de los archivos.")
+st.sidebar.info("El polímero, concentración y caudal se extraen automáticamente de los nombres de los archivos.")
 
 ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=5.00)
 ancho = ancho_mm / 10.0 # cm
@@ -42,9 +52,9 @@ st.sidebar.success("🤖 Calibración Óptica Automatizada Activada. El algoritm
 datos_consolidados = []
 
 # --- 3. PROCESAMIENTO EN BUCLE (MATEMÁTICAS EN SEGUNDO PLANO) ---
-if archivos_subidos:
-    for archivo in archivos_subidos:
-        nombre_archivo = archivo.name
+if archivos_validos:
+    for nombre_archivo in archivos_validos:
+        ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
         
         tipo_polimero = "Desconocido"
         val_q = 0.036
@@ -62,8 +72,11 @@ if archivos_subidos:
         if match_ppm:
             val_ppm = int(match_ppm.group(1))
 
-        file_bytes = np.asarray(bytearray(archivo.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, 1)
+        # Lectura directa desde la ruta local usando OpenCV
+        img = cv2.imread(ruta_imagen)
+        if img is None:
+            continue
+            
         pixeles_totales = img.shape[0] * img.shape[1] 
         
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
@@ -109,7 +122,6 @@ if archivos_subidos:
             permeabilidad_mD = 0.0
 
         # --- NUEVOS CÁLCULOS VOLUMÉTRICOS EN MILÍMETROS CÚBICOS (mm³) ---
-        # 1 cm = 10 mm  |  1 cm² = 100 mm²  |  1 cm³ = 1000 mm³
         largo_mm = ancho_mm * (img.shape[1] / img.shape[0])
         area_total_mm2 = ancho_mm * largo_mm
         area_barrida_mm2 = porosidad_efectiva * area_total_mm2
@@ -117,7 +129,6 @@ if archivos_subidos:
         Vp_mm3 = area_total_mm2 * espesor_mm * porosidad_abs
         Np_mm3 = area_barrida_mm2 * espesor_mm * porosidad_abs
         
-        # Caudal (val_q) está en ml/min. 1 ml = 1000 mm³.
         V_iny_mm3 = val_q * 1000 * t_bt
         VPI_bt = V_iny_mm3 / Vp_mm3 if Vp_mm3 > 0 else 0
 
@@ -135,8 +146,6 @@ if archivos_subidos:
             "Np al BT (mm³)": Np_mm3,
             "VPI al BT": VPI_bt
         })
-        
-        archivo.seek(0)
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
     st.markdown("---")
@@ -169,15 +178,12 @@ if archivos_subidos:
     st.subheader("🔍 MICROMODELO")
     st.info("Selecciona un micromodelo específico del lote para visualizar sus máscaras y el análisis científico detallado.")
     
-    nombres_archivos = [f.name for f in archivos_subidos]
-    archivo_seleccionado = st.selectbox("Seleccionar Micromodelo:", nombres_archivos)
+    archivo_seleccionado = st.selectbox("Seleccionar Micromodelo:", archivos_validos)
     
     datos_fila = df_maestro[df_maestro["Archivo"] == archivo_seleccionado].iloc[0]
     
-    archivo_obj = next(f for f in archivos_subidos if f.name == archivo_seleccionado)
-    archivo_obj.seek(0)
-    file_bytes_ui = np.asarray(bytearray(archivo_obj.read()), dtype=np.uint8)
-    img_ui = cv2.imdecode(file_bytes_ui, 1)
+    # Lectura directa para la UI
+    img_ui = cv2.imread(os.path.join(CARPETA_MICROMODELOS, archivo_seleccionado))
     
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
     hsv_ui = cv2.cvtColor(img_suavizada_ui, cv2.COLOR_BGR2HSV)
@@ -336,3 +342,5 @@ if archivos_subidos:
             "VPI": "{:.4f}",
             "Volumen Inyectado (mm³)": "{:.0f}"
         }), use_container_width=True)
+else:
+    st.info("Sube las imágenes a la carpeta 'micromodelos' para visualizar los resultados.")
