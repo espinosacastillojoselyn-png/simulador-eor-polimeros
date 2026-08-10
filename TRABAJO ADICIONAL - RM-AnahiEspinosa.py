@@ -312,15 +312,18 @@ if archivos_validos:
     # 2. Curva realista (Exponente 0.85 para simular atenuación no lineal)
     np_array = Np_final * ((tiempos / t_bt) ** 0.85)
     
-    # 3. VPI y Volumen Inyectado crecen de manera constante en el tiempo
-    v_iny_array = (datos_fila['Caudal (ml/min)'] * 1000) * tiempos
+    # 3. VPI (Adimensional)
     vpi_array = VPI_final * (tiempos / t_bt)
+    
+    # 4. Volumen Inyectado en MILILITROS (ml) - Igual que en la tesis
+    # El caudal (val_q) ya está en ml/min, así que solo multiplicamos por el tiempo.
+    v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
     
     datos_grafica = pd.DataFrame({
         "Tiempo (min)": tiempos,
         "Np (mm³)": np_array,
         "VPI": vpi_array,
-        "Volumen Inyectado (mm³)": v_iny_array
+        "Volumen Inyectado (ml)": v_iny_ml_array
     })
     
     # Dibujar gráficas
@@ -335,12 +338,12 @@ if archivos_validos:
         st.line_chart(datos_grafica, x="VPI", y="Np (mm³)", color="#3498DB")
         
     with st.expander("Ver Tabla de Datos de Producción Estimada"):
-        # Formatear la tabla manteniendo VPI en decimal
+        # Formatear la tabla para que sea idéntica al estándar de la tesis
         st.dataframe(datos_grafica.style.format({
             "Tiempo (min)": "{:.0f}",
             "Np (mm³)": "{:.2f}",
-            "VPI": "{:.4f}",
-            "Volumen Inyectado (mm³)": "{:.0f}"
+            "VPI": "{:.2f}",
+            "Volumen Inyectado (ml)": "{:.2f}"
         }), use_container_width=True)
 else:
     st.info("Sube las imágenes a la carpeta 'micromodelos' para visualizar los resultados.")
