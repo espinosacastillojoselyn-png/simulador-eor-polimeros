@@ -20,7 +20,7 @@ except Exception as e:
 st.markdown("---")
 
 # --- 1. CARGA DE IMAGEN MÚLTIPLE (BATCH PROCESSING) ---
-st.subheader("🖼️ 1. Carga tus Micromodelos (Procesamiento por Lotes)")
+st.subheader("🖼️ 1. Carga tus Micromodelos (Procesamiento Automático por Lotes)")
 # accept_multiple_files=True permite subir todas las imágenes de la carpeta a la vez
 archivos_subidos = st.file_uploader("Selecciona múltiples imágenes JPG/PNG", type=['jpg', 'jpeg', 'png'], accept_multiple_files=True)
 
@@ -37,12 +37,7 @@ Dp_cm = Dp_cm_input / 10.0 # cm
 porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
 
 st.sidebar.markdown("---")
-# Los nuevos controles ópticos dinámicos integrados
-st.sidebar.subheader("🎛️ Calibración Óptica del Fluido")
-st.sidebar.caption("Ajusta si el modelo detecta ruido de vidrio o pierde canales finos.")
-matiz_min = st.sidebar.slider("Matiz Azul Mínimo", 80, 110, 100)
-matiz_max = st.sidebar.slider("Matiz Azul Máximo", 130, 170, 140)
-sat_min = st.sidebar.slider("Saturación Mínima", 20, 150, 50)
+st.sidebar.success("🤖 Calibración Óptica Automatizada Activada. El algoritmo aislará el volumen de polímero mediante análisis HSV y limpieza morfológica.")
 
 # Lista para almacenar los resultados consolidados
 datos_consolidados = []
@@ -74,15 +69,22 @@ if archivos_subidos:
         img = cv2.imdecode(file_bytes, 1)
         pixeles_totales = img.shape[0] * img.shape[1] 
         
-        # Aislamiento del Polímero (Filtro Suavizado + HSV Dinámico)
+        # --- Aislamiento del Polímero (100% Automático) ---
+        # 1. Filtro de suavizado para homogenizar reflejos del vidrio
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
-        lower_blue = np.array([matiz_min, sat_min, 50])
-        upper_blue = np.array([matiz_max, 255, 255])
+        
+        # 2. Rango de color azul estandarizado (cubre desde celestes hasta azules profundos)
+        lower_blue = np.array([90, 40, 40])
+        upper_blue = np.array([150, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
         
+        # 3. Limpieza Morfológica Autónoma
         kernel = np.ones((5,5), np.uint8)
+        # MORPH_OPEN: Elimina los falsos positivos (sombras grises o ruido de granos)
         mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        # MORPH_CLOSE: Rellena los huecos vacíos dentro de los canales de polímero
+        mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
         # Cálculos de Porosidad
         pixeles_polimero = np.sum(mask_limpia == 255)
@@ -183,8 +185,10 @@ if archivos_subidos:
     # Re-aplicar solo los filtros visuales para dibujar las columnas
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
     hsv_ui = cv2.cvtColor(img_suavizada_ui, cv2.COLOR_BGR2HSV)
-    mask_ui = cv2.inRange(hsv_ui, lower_blue, upper_blue)
-    mask_limpia_ui = cv2.morphologyEx(mask_ui, cv2.MORPH_OPEN, kernel)
+    mask_ui = cv2.inRange(hsv_ui, np.array([90, 40, 40]), np.array([150, 255, 255]))
+    kernel_ui = np.ones((5,5), np.uint8)
+    mask_limpia_ui = cv2.morphologyEx(mask_ui, cv2.MORPH_OPEN, kernel_ui)
+    mask_limpia_ui = cv2.morphologyEx(mask_limpia_ui, cv2.MORPH_CLOSE, kernel_ui)
     esqueleto_ui = skeletonize(mask_limpia_ui > 0)
 
     # Visualización en Columnas
