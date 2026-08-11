@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación de Micromodelos de Desplazamiento EOR: Tortuosidad y Velocidad de Polímeros")
+st.title("Evaluación de Micromodelos de Desplazamiento EOR: Porosidad Efectiva, Tortuosidad y Permeabilidad en mm²")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -46,11 +46,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Pre-procesamiento CLAHE y Balance de Píxeles Activos.")
+st.sidebar.success("🤖 Pre-procesamiento CLAHE y Permeabilidad en mm² Activos.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE CON CLAHE Y CÁLCULO DIRECTO ---
+# --- 3. PROCESAMIENTO EN BUCLE ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -88,7 +88,7 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img_corregida, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        # Filtro HSV calibrado para captar el azul uniforme sin cortes en los bordes
+        # Filtro HSV calibrado
         lower_blue = np.array([95, 70, 70])
         upper_blue = np.array([135, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -100,8 +100,13 @@ if archivos_validos:
         pixeles_polimero = np.sum(mask_limpia == 255)
         pixeles_poros_totales = pixeles_totales * porosidad_abs
         
+        # --- CÁLCULO DE POROSIDAD EFECTIVA (Φ_eff) ---
+        pixeles_conectados = np.sum(mask_limpia > 0)
+        fraccion_conectividad = pixeles_conectados / pixeles_totales if pixeles_totales > 0 else 0
+        porosidad_efectiva = porosidad_abs * min(1.0, fraccion_conectividad / (porosidad_abs if porosidad_abs > 0 else 1))
+        
         fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
-        eficiencia_barrido = fr_porcentaje / 100.0
+        eficiencia_barrido = fr_porcentaje / 100.0 # EA (%)
         sor_fraccion = max(0.0, 1.0 - eficiencia_barrido)
         
         bool_mask = mask_limpia > 0
@@ -124,8 +129,10 @@ if archivos_validos:
             S_vp = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
             k_cm2 = porosidad_abs / (2 * tortuosidad * (S_vp**2))
             permeabilidad_mD = k_cm2 * 1.013e11 
+            permeabilidad_mm2 = k_cm2 * 100.0 # Conversión de cm² a mm²
         else:
             permeabilidad_mD = 0.0
+            permeabilidad_mm2 = 0.0
 
         Np_ml = eficiencia_barrido * Vp_ml
         V_iny_ml = val_q * t_bt
@@ -136,10 +143,12 @@ if archivos_validos:
             "Polímero": tipo_polimero,
             "Concentración (ppm)": val_ppm,
             "Caudal (ml/min)": val_q,
+            "Porosidad Efectiva (ϕ_eff)": porosidad_efectiva,
             "Tortuosidad Areal (τ)": tortuosidad,
             "Velocidad Real (cm/s)": velocidad_real,
             "Eficiencia Barrido EA (%)": fr_porcentaje,
-            "Permeabilidad Mod. (mD)": permeabilidad_mD,
+            "Permeabilidad (mD)": permeabilidad_mD,
+            "Permeabilidad (mm²)": permeabilidad_mm2,
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
             "% Fr": fr_porcentaje,
@@ -178,12 +187,10 @@ if archivos_validos:
     st.info("Selecciona un micromodelo específico del lote para visualizar sus máscaras y el análisis científico detallado.")
     
     archivo_seleccionado = st.selectbox("Seleccionar Micromodelo:", archivos_validos)
-    
     datos_fila = df_maestro[df_maestro["Archivo"] == archivo_seleccionado].iloc[0]
     
     img_ui = cv2.imread(os.path.join(CARPETA_MICROMODELOS, archivo_seleccionado))
     
-    # Aplicar CLAHE también en la vista de inspección individual
     lab_ui = cv2.cvtColor(img_ui, cv2.COLOR_BGR2LAB)
     l_ui, a_ui, b_ui = cv2.split(lab_ui)
     cl_ui = clahe.apply(l_ui)
@@ -221,46 +228,62 @@ if archivos_validos:
         st.metric("Fluido Inyectado", f"{datos_fila['Polímero']} {datos_fila['Concentración (ppm)']} ppm")
         st.metric("Caudal de Inyección", f"{datos_fila['Caudal (ml/min)']} ml/min")
     with col2:
-        st.markdown("**Porcentaje de Recuperación (%Fr)**")
-        st.latex(r"\%Fr = \left(\frac{N_p}{V_p}\right) \times 100")
-        st.latex(rf"\%Fr = {datos_fila['% Fr']:.2f} \%")
+        st.markdown("**Recuperación y Eficiencia (%Fr y $E_A$)**")
+        st.latex(r"\%Fr = E_A = \left(\frac{N_p}{V_p}\right) \times 100")
+        st.latex(rf"\%Fr = E_A = {datos_fila['% Fr']:.2f} \%")
     with col3:
         st.markdown("**Saturación Residual ($S_{or}$)**")
         st.latex(r"S_{or} = 1.0 - \left(\frac{\%Fr}{100}\right)")
         st.latex(rf"S_{{or}} = {datos_fila['Sor (fracción)']:.4f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Cinemática del Fluido (Velocidades)")
+    st.markdown("#### 🔹 Propiedades Petrofísicas: Porosidad Efectiva y Tortuosidad")
     col_v1, col_v2 = st.columns([1.5, 1])
     with col_v1:
-        st.markdown("**Velocidad Real del Polímero**")
-        st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{abs}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
-        st.latex(rf"v_{{real}} = {datos_fila['Velocidad Real (cm/s)']:.6f} \text{{ cm/s}}")
+        st.markdown("**Ecuaciones de Porosidad Efectiva y Tortuosidad Areal**")
+        st.latex(r"\phi_{eff} = \phi_{abs} \cdot \left(\frac{A_{conectada}}{A_{total}}\right)")
+        st.latex(r"\tau = \frac{L_e}{L_r}")
+        st.latex(rf"\phi_{{eff}} = {datos_fila['Porosidad Efectiva (ϕ_eff)']:.4f} \quad ; \quad \tau = {datos_fila['Tortuosidad Areal (τ)']:.4f}")
     with col_v2:
         st.markdown(r"""
         **Donde:**
-        *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
-        *   $A_{transversal}$: Área transversal ($ancho \times espesor$).
-        *   $\phi_{abs}$: Porosidad absoluta (fracción).
+        *   $\phi_{abs}$: Porosidad absoluta de entrada ($0.39$).
+        *   $\phi_{eff}$: Porosidad efectiva conectada.
+        *   $L_e$: Longitud real del camino de flujo (esqueleto en píxeles).
+        *   $L_r$: Longitud recta del micromodelo.
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Propiedades Petrofísicas Modificadas")
+    st.markdown("#### 🔹 Cinemática del Fluido (Velocidades)")
+    col_vel1, col_vel2 = st.columns([1.5, 1])
+    with col_vel1:
+        st.markdown("**Velocidad Real del Polímero**")
+        st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{abs}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
+        st.latex(rf"v_{{real}} = {datos_fila['Velocidad Real (cm/s)']:.6f} \text{{ cm/s}}")
+    with col_vel2:
+        st.markdown(r"""
+        **Donde:**
+        *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
+        *   $A_{transversal}$: Área transversal ($ancho \times espesor$).
+        *   $\tau$: Tortuosidad areal.
+        """)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🔹 Propiedades Petrofísicas Modificadas (Kozeny-Carman)")
     col_k1, col_k2 = st.columns([1.5, 1])
     with col_k1:
-        st.markdown("**Permeabilidad Estimada - Modelo de Kozeny-Carman Modificado**")
+        st.markdown("**Permeabilidad Estimada (mD y mm²)**")
         st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{abs})}{\phi_{abs} \cdot D_p}")
         st.latex(r"k = \frac{\phi_{abs}}{2 \cdot \tau \cdot S_{vp}^2}")
-        st.latex(rf"k = {datos_fila['Permeabilidad Mod. (mD)']:.2f} \text{{ mD}}")
+        st.latex(rf"k = {datos_fila['Permeabilidad (mD)']:.2f} \text{{ mD}} \quad (\approx {datos_fila['Permeabilidad (mm²)']:.4f} \text{{ mm}}^2)")
     with col_k2:
         st.markdown(r"""
         **Donde:**
         *   $S_{vp}$: Área superficial específica ($\text{cm}^{-1}$).
         *   $h$: Espesor del micromodelo ($\text{cm}$).
-        *   $\phi_{abs}$: Porosidad absoluta (fracción).
         *   $D_p$: Diámetro del grano cilíndrico ($\text{cm}$).
-        *   $\tau$: Tortuosidad areal (adimensional).
+        *   $1 \text{ cm}^2 = 100 \text{ mm}^2$.
         """)
 
     # --- 7. FUNDAMENTO MATEMÁTICO DE LAS CURVAS DINÁMICAS ---
@@ -268,39 +291,21 @@ if archivos_validos:
     st.subheader("🔹 Cálculos Volumétricos Dinámicos y de Recobro")
     
     col_eq1, col_eq2 = st.columns(2)
-    
     with col_eq1:
         st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
-        st.write("Cálculo volumétrico en mililitros (ml) asumiendo $S_{oi} = 1$:")
         st.latex(r"N_p(t) = A_B(t) \cdot h \cdot \phi_{abs} \cdot S_{oi}")
-        st.markdown(r"""
-        **Donde:**
-        *   $A_B(t)$: Área barrida en el tiempo $t$ ($\text{cm}^2$).
-        *   $h$: Espesor del modelo ($\text{cm}$).
-        *   $\phi_{abs}$: Porosidad absoluta (fracción).
-        """)
-        
     with col_eq2:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
-        st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico:")
         st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
-        st.markdown(r"""
-        **Donde:**
-        *   $q$: Caudal de inyección ($\text{ml/min}$).
-        *   $t$: Tiempo transcurrido ($\text{min}$).
-        *   $V_p$: Volumen poroso total ($\text{ml}$).
-        """)
 
-    # --- 8. GRÁFICAS Y TABLA DE COMPORTAMIENTO DINÁMICO CON %FR Y SOR ---
+    # --- 8. GRÁFICAS Y TABLA DE COMPORTAMIENTO DINÁMICO ---
     st.markdown("---")
     st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
-    st.write("Las gráficas y la tabla detallan la evolución temporal de la producción, incluyendo el porcentaje de recuperación (%Fr) y la saturación residual (Sor) paso a paso.")
     
     Np_final = datos_fila['Np al BT (ml)']
     VPI_final = datos_fila['VPI al BT']
     
     tiempos = np.arange(0, int(t_bt) + 10, 10)
-    
     np_array = Np_final * ((tiempos / t_bt) ** 0.85)
     vpi_array = VPI_final * (tiempos / t_bt)
     v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
@@ -320,11 +325,9 @@ if archivos_validos:
     })
     
     col_g1, col_g2 = st.columns(2)
-    
     with col_g1:
         st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
         st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (ml)", color="#2ECC71")
-        
     with col_g2:
         st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
         st.line_chart(datos_grafica, x="VPI", y="Np (ml)", color="#3498DB")
@@ -349,9 +352,4 @@ st.info("Las ecuaciones petrofísicas, los algoritmos de calibración óptica y 
 
 st.markdown("""
 > **Herrera Silva, L. R. (2020).** *Estudio experimental del desplazamiento y eficiencia de una inundación polimérica en micromodelos transparentes*. Tesis de Maestría. Universidad de Buenos Aires, Facultad de Ingeniería (IGPUBA).
-
-**Aplicación en este software:**
-* **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
-* **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
-* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
 """)
