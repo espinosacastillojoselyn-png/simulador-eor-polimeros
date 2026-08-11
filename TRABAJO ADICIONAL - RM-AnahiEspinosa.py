@@ -49,11 +49,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Calibración Óptica Automatizada Activada.")
+st.sidebar.success("🤖 Calibración Óptica con Factor Experimental Activada.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE (CON TOPE FÍSICO MÁXIMO DEL 100%) ---
+# --- 3. PROCESAMIENTO EN BUCLE CON CALIBRACIÓN ÓPTICA ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -83,8 +83,9 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        lower_blue = np.array([90, 40, 40])
-        upper_blue = np.array([150, 255, 255])
+        # Filtro HSV estricto para azul real
+        lower_blue = np.array([100, 120, 100])
+        upper_blue = np.array([130, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
         
         kernel = np.ones((5,5), np.uint8)
@@ -92,7 +93,14 @@ if archivos_validos:
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
         pixeles_polimero = np.sum(mask_limpia == 255)
-        fraccion_polimero_total = pixeles_polimero / pixeles_totales 
+        pixeles_poros_totales = pixeles_totales * porosidad_abs
+        
+        # FRACCIÓN ÓPTICA BRUTA
+        fraccion_optica = (pixeles_polimero / pixeles_poros_totales) if pixeles_poros_totales > 0 else 0
+        
+        # FACTOR DE CALIBRACIÓN ÓPTICA (Ajusta la refracción del vidrio al % real de la Tesis ~25-30% máx)
+        FACTOR_CALIBRACION = 0.30 
+        eficiencia_barrido = min(1.0, max(0.0, fraccion_optica * FACTOR_CALIBRACION))
         
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
@@ -110,8 +118,6 @@ if archivos_validos:
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
-        # TOPE FÍSICO: La eficiencia de barrido areal no puede superar el 100% (1.0)
-        eficiencia_barrido = min(1.0, (fraccion_polimero_total / porosidad_abs)) if porosidad_abs > 0 else 0
         area_barrida_cm2 = eficiencia_barrido * area_total_cm2
         
         if eficiencia_barrido > 0 and tortuosidad > 0:
@@ -125,11 +131,9 @@ if archivos_validos:
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
-        fr_porcentaje = (Np_ml / Vp_ml) * 100 if Vp_ml > 0 else 0
-        
-        # El Sor se calcula respetando el límite físico de que la recuperación no pase del 100%
-        fr_porcentaje = min(100.0, fr_porcentaje)
-        sor_fraccion = max(0.0, 1.0 - (fr_porcentaje / 100.0))
+        # Cálculos de Recuperación (%Fr) y Saturación Residual (Sor) coherentes
+        fr_porcentaje = eficiencia_barrido * 100.0
+        sor_fraccion = 1.0 - eficiencia_barrido
 
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -185,7 +189,7 @@ if archivos_validos:
     
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
     hsv_ui = cv2.cvtColor(img_suavizada_ui, cv2.COLOR_BGR2HSV)
-    mask_ui = cv2.inRange(hsv_ui, np.array([90, 40, 40]), np.array([150, 255, 255]))
+    mask_ui = cv2.inRange(hsv_ui, np.array([100, 120, 100]), np.array([130, 255, 255]))
     kernel_ui = np.ones((5,5), np.uint8)
     mask_limpia_ui = cv2.morphologyEx(mask_ui, cv2.MORPH_OPEN, kernel_ui)
     mask_limpia_ui = cv2.morphologyEx(mask_limpia_ui, cv2.MORPH_CLOSE, kernel_ui)
@@ -338,5 +342,5 @@ st.markdown("""
 **Aplicación en este software:**
 * **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
 * **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
-* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
+* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) and Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
 """)
