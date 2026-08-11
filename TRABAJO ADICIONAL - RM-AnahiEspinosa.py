@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación de Micromodelos EOR: Permeabilidad con Porosidad Efectiva en mm²")
+st.title("Evaluación de Micromodelos cEOR")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -46,7 +46,7 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Kozeny-Carman con Porosidad Efectiva y mm² Activo.")
+st.sidebar.success("🤖 Kozeny-Carman con Porosidad Efectiva en mm² Activo.")
 
 datos_consolidados = []
 
@@ -126,15 +126,13 @@ if archivos_validos:
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
-        # --- PERMEABILIDAD USANDO POROSIDAD EFECTIVA (Kozeny-Carman Modificado) ---
+        # --- PERMEABILIDAD EN mm² USANDO POROSIDAD EFECTIVA (Kozeny-Carman) ---
         if eficiencia_barrido > 0 and tortuosidad > 0:
             S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
             k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
-            permeabilidad_mm2 = k_cm2 * 100.0 # Conversión de cm² a mm²
-            permeabilidad_mD = k_cm2 * 1.013e11 
+            permeabilidad_mm2 = k_cm2 * 100.0 # Conversión estricta de cm² a mm²
         else:
             permeabilidad_mm2 = 0.0
-            permeabilidad_mD = 0.0
 
         Np_ml = eficiencia_barrido * Vp_ml
         V_iny_ml = val_q * t_bt
@@ -150,7 +148,6 @@ if archivos_validos:
             "Velocidad Real (cm/s)": velocidad_real,
             "Eficiencia Barrido EA (%)": fr_porcentaje,
             "Permeabilidad (mm²)": permeabilidad_mm2,
-            "Permeabilidad (mD)": permeabilidad_mD,
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
             "% Fr": fr_porcentaje,
@@ -276,15 +273,15 @@ if archivos_validos:
     st.markdown("#### 🔹 Permeabilidad (Kozeny-Carman con Porosidad Efectiva)")
     col_k1, col_k2 = st.columns([1.5, 1])
     with col_k1:
-        st.markdown("**Permeabilidad Estimada (mm² y mD)**")
+        st.markdown("**Permeabilidad Estimada en mm²**")
         st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
         st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
-        st.latex(rf"k = {datos_fila['Permeabilidad (mm²)']:.4f} \text{{ mm}}^2 \quad (\approx {datos_fila['Permeabilidad (mD)']:.2f} \text{{ mD}})")
+        st.latex(rf"k = {datos_fila['Permeabilidad (mm²)']:.4f} \text{{ mm}}^2")
     with col_k2:
         st.markdown(r"""
         **Donde:**
         *   Se sustituye $\phi_{abs}$ por la **porosidad efectiva ($\phi_{eff}$)** en la ecuación de área superficial específica ($S_{vp}$) y de flujo ($k$).
-        *   Unidades presentadas primordialmente en milímetros cuadrados ($\text{mm}^2$).
+        *   Unidades presentadas en milímetros cuadrados ($\text{mm}^2$).
         """)
 
     # --- 7. CURVAS DINÁMICAS ---
