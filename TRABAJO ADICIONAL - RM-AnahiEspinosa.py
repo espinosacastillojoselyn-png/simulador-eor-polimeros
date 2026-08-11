@@ -49,11 +49,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Calibración Óptica con Factor Experimental Activada.")
+st.sidebar.success("🤖 Balance de Masas por Píxeles Activo.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE CON CALIBRACIÓN ÓPTICA EXPERIMENTAL ---
+# --- 3. PROCESAMIENTO EN BUCLE CON CÁLCULO DIRECTO DE PÍXELES ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -95,11 +95,12 @@ if archivos_validos:
         pixeles_polimero = np.sum(mask_limpia == 255)
         pixeles_poros_totales = pixeles_totales * porosidad_abs
         
-        fraccion_optica = (pixeles_polimero / pixeles_poros_totales) if pixeles_poros_totales > 0 else 0
+        # Eficiencia Areal / Porcentaje de Recuperación real por píxeles
+        fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
+        eficiencia_barrido = fr_porcentaje / 100.0
         
-        # FACTOR DE CALIBRACIÓN ÓPTICA (Equilibra la refracción del vidrio con el rango real de la Tesis ~25% máx)
-        FACTOR_CALIBRACION = 0.35 
-        eficiencia_barrido = min(1.0, max(0.0, fraccion_optica * FACTOR_CALIBRACION))
+        # Saturación Residual Real (Sor)
+        sor_fraccion = max(0.0, 1.0 - eficiencia_barrido)
         
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
@@ -117,8 +118,6 @@ if archivos_validos:
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
-        area_barrida_cm2 = eficiencia_barrido * area_total_cm2
-        
         if eficiencia_barrido > 0 and tortuosidad > 0:
             S_vp = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
             k_cm2 = porosidad_abs / (2 * tortuosidad * (S_vp**2))
@@ -126,13 +125,9 @@ if archivos_validos:
         else:
             permeabilidad_mD = 0.0
 
-        Np_ml = area_barrida_cm2 * espesor * porosidad_abs
+        Np_ml = eficiencia_barrido * Vp_ml
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
-
-        # Cálculos de Recuperación (%Fr) y Saturación Residual (Sor) reales y calibrados
-        fr_porcentaje = eficiencia_barrido * 100.0
-        sor_fraccion = 1.0 - eficiencia_barrido
 
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -141,7 +136,7 @@ if archivos_validos:
             "Caudal (ml/min)": val_q,
             "Tortuosidad Areal (τ)": tortuosidad,
             "Velocidad Real (cm/s)": velocidad_real,
-            "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
+            "Eficiencia Barrido EA (%)": fr_porcentaje,
             "Permeabilidad Mod. (mD)": permeabilidad_mD,
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
@@ -151,7 +146,7 @@ if archivos_validos:
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
     st.markdown("---")
-    st.subheader("📋 RESUMEN RESULTADOS")
+    st.subheader("📋 RESUMEN RESULTADOS (Balance de Masas por Píxeles)")
     df_maestro = pd.DataFrame(datos_consolidados)
     
     st.markdown("""
