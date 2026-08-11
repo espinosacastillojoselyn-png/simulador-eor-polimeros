@@ -49,11 +49,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Calibración Óptica Automatizada Activada (Sin Restricciones).")
+st.sidebar.success("🤖 Calibración Óptica Automatizada Activada.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE (SIN LÍMITES ARTIFICIALES) ---
+# --- 3. PROCESAMIENTO EN BUCLE (CON TOPE FÍSICO MÁXIMO DEL 100%) ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -107,12 +107,11 @@ if archivos_validos:
         v_intersticial = v_darcy / porosidad_abs if porosidad_abs > 0 else 0
         velocidad_real = v_intersticial * tortuosidad 
         
-        # Volúmenes Geométricos Fijos
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
-        # Eficiencia Areal basada puramente en la lectura óptica de píxeles
-        eficiencia_barrido = fraccion_polimero_total / porosidad_abs if porosidad_abs > 0 else 0
+        # TOPE FÍSICO: La eficiencia de barrido areal no puede superar el 100% (1.0)
+        eficiencia_barrido = min(1.0, (fraccion_polimero_total / porosidad_abs)) if porosidad_abs > 0 else 0
         area_barrida_cm2 = eficiencia_barrido * area_total_cm2
         
         if eficiencia_barrido > 0 and tortuosidad > 0:
@@ -122,14 +121,15 @@ if archivos_validos:
         else:
             permeabilidad_mD = 0.0
 
-        # Cálculo volumétrico real de Np en ml
         Np_ml = area_barrida_cm2 * espesor * porosidad_abs
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
-        # Cálculos puros de Recuperación (%Fr) y Saturación Residual (Sor)
         fr_porcentaje = (Np_ml / Vp_ml) * 100 if Vp_ml > 0 else 0
-        sor_fraccion = 1.0 - (fr_porcentaje / 100.0)
+        
+        # El Sor se calcula respetando el límite físico de que la recuperación no pase del 100%
+        fr_porcentaje = min(100.0, fr_porcentaje)
+        sor_fraccion = max(0.0, 1.0 - (fr_porcentaje / 100.0))
 
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -338,5 +338,5 @@ st.markdown("""
 **Aplicación en este software:**
 * **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
 * **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
-* **Recuperación Dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
+* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
 """)
