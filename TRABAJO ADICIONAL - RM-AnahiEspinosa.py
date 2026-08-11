@@ -46,11 +46,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Balance de Masas por Píxeles Activo.")
+st.sidebar.success("🤖 Filtro HSV Ajustado sin Viñeteo Activo.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE CON CÁLCULO DIRECTO DE PÍXELES ---
+# --- 3. PROCESAMIENTO EN BUCLE ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -79,8 +79,9 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        lower_blue = np.array([100, 120, 100])
-        upper_blue = np.array([130, 255, 255])
+        # FILTRO HSV AJUSTADO: Más tolerante a la sombra de los bordes (Saturación y Brillo a 70)
+        lower_blue = np.array([95, 70, 70])
+        upper_blue = np.array([135, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
         
         kernel = np.ones((5,5), np.uint8)
@@ -175,7 +176,8 @@ if archivos_validos:
     
     img_suavizada_ui = cv2.GaussianBlur(img_ui, (5, 5), 0)
     hsv_ui = cv2.cvtColor(img_suavizada_ui, cv2.COLOR_BGR2HSV)
-    mask_ui = cv2.inRange(hsv_ui, np.array([100, 120, 100]), np.array([130, 255, 255]))
+    # Mismo filtro HSV ajustado para la vista individual
+    mask_ui = cv2.inRange(hsv_ui, np.array([95, 70, 70]), np.array([135, 255, 255]))
     kernel_ui = np.ones((5,5), np.uint8)
     mask_limpia_ui = cv2.morphologyEx(mask_ui, cv2.MORPH_OPEN, kernel_ui)
     mask_limpia_ui = cv2.morphologyEx(mask_limpia_ui, cv2.MORPH_CLOSE, kernel_ui)
@@ -288,7 +290,6 @@ if archivos_validos:
     vpi_array = VPI_final * (tiempos / t_bt)
     v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
     
-    # Cálculo dinámico de %Fr y Sor en cada intervalo de tiempo
     area_total_cm2_g = ancho * largo_cm
     Vp_ml_g = area_total_cm2_g * espesor * porosidad_abs
     fr_array = (np_array / Vp_ml_g) * 100 if Vp_ml_g > 0 else np.zeros_like(np_array)
