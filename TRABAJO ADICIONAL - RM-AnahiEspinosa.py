@@ -35,7 +35,7 @@ else:
 st.sidebar.header("📝 2. Parámetros Físicos")
 st.sidebar.info("Dimensiones estándar del Micromodelo de la Tesis (Ancho 180, Largo 200, Espesor 0.8)")
 
-# DIMENSIONES EXACTAS DEL MODELO FÍSICO
+# DIMENSIONES EXACTAS DEL MODELO FÍSICO (Tesis Herrera Silva, 2020)
 ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=180.00)
 ancho = ancho_mm / 10.0 # cm
 largo_mm = st.sidebar.number_input("Largo del Micromodelo (mm)", value=200.00)
@@ -126,8 +126,8 @@ if archivos_validos:
         else:
             permeabilidad_mD = 0.0
 
-        # Cálculo dinámico final de volumen recuperado (Np)
-        Np_ml = fraccion_polimero_total * area_total_cm2 * espesor
+        # Cálculo dinámico final de volumen recuperado (Np) en ml
+        Np_ml = area_barrida_cm2 * espesor * porosidad_abs
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
@@ -321,5 +321,20 @@ if archivos_validos:
             "VPI": "{:.2f}",
             "Volumen Inyectado (ml)": "{:.2f}"
         }), use_container_width=True)
+        
 else:
     st.info("Sube las imágenes a la carpeta 'micromodelos' para visualizar los resultados.")
+
+# --- 9. REFERENCIAS BIBLIOGRÁFICAS ---
+st.markdown("---")
+st.subheader("📚 Respaldo Teórico y Validación Metodológica")
+st.info("Las ecuaciones petrofísicas, los algoritmos de calibración óptica y la validación fenomenológica de este simulador están fundamentados en el trabajo experimental de:")
+
+st.markdown("""
+> **Herrera Silva, L. R. (2020).** *Estudio experimental del desplazamiento y eficiencia de una inundación polimérica en micromodelos transparentes*. Tesis de Maestría. Universidad de Buenos Aires, Facultad de Ingeniería (IGPUBA).
+
+**Aplicación en este software:**
+* **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
+* **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
+* **Recuperación Dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico (*shear thinning/thickening*) de la Goma Xántica y la HPAM.
+""")
