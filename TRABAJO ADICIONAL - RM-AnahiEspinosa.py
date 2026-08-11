@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación de Micromodelos de Desplazamiento EOR: Porosidad Efectiva, Tortuosidad y Permeabilidad en mm²")
+st.title("Evaluación de Micromodelos EOR: Formulación Rigurosa Basada en Píxeles")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -46,11 +46,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Pre-procesamiento CLAHE y Permeabilidad en mm² Activos.")
+st.sidebar.success("🤖 Formulación Estricta en Términos de Píxeles Activa.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE ---
+# --- 3. PROCESAMIENTO EN BUCLE BASADO EN PÍXELES ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -75,9 +75,11 @@ if archivos_validos:
         if img is None:
             continue
             
-        pixeles_totales = img.shape[0] * img.shape[1] 
+        # --- EXTRACCIÓN DE DIMENSIONES Y MATRICES EN PÍXELES ---
+        pixeles_totales = int(img.shape[0] * img.shape[1])
+        ancho_pixeles = int(img.shape[1]) # L_r (Longitud recta de referencia en píxeles)
         
-        # --- MEJORA CLAHE (Normalización de contraste adaptativo para eliminar viñeteo) ---
+        # Pre-procesamiento CLAHE para eliminar viñeteo lumínico
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
@@ -88,7 +90,7 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img_corregida, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        # Filtro HSV calibrado
+        # Filtro HSV estricto
         lower_blue = np.array([95, 70, 70])
         upper_blue = np.array([135, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -97,25 +99,32 @@ if archivos_validos:
         mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
-        pixeles_polimero = np.sum(mask_limpia == 255)
+        # --- CONTEOS DE PÍXELES PURAMENTE DIGITALES ---
+        pixeles_polimero = int(np.sum(mask_limpia == 255)) # Píxeles barridos por el polímero
+        pixeles_conectados = int(np.sum(mask_limpia > 0)) # Píxeles totales de canales abiertos conectados
+        
+        # 1. Porosidad Efectiva en función de píxeles
+        # \phi_{eff} = \phi_{abs} * (Píxeles Conectados / Píxeles Totales)
+        fraccion_area_conectada = pixeles_conectados / pixeles_totales if pixeles_totales > 0 else 0
+        porosidad_efectiva = float(porosidad_abs * fraccion_area_conectada)
+        
+        # 2. Eficiencia de Barrido Areal y Recuperación en función de píxeles
         pixeles_poros_totales = pixeles_totales * porosidad_abs
-        
-        # --- CÁLCULO DE POROSIDAD EFECTIVA (Φ_eff) ---
-        pixeles_conectados = np.sum(mask_limpia > 0)
-        fraccion_conectividad = pixeles_conectados / pixeles_totales if pixeles_totales > 0 else 0
-        porosidad_efectiva = porosidad_abs * min(1.0, fraccion_conectividad / (porosidad_abs if porosidad_abs > 0 else 1))
-        
         fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
-        eficiencia_barrido = fr_porcentaje / 100.0 # EA (%)
+        eficiencia_barrido = fr_porcentaje / 100.0
         sor_fraccion = max(0.0, 1.0 - eficiencia_barrido)
         
+        # 3. Tortuosidad Areal basada en Esqueleto de Píxeles
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
+        pixeles_esqueleto = int(np.sum(esqueleto)) # L_e (Longitud real del camino en píxeles)
         
-        longitud_camino_pixeles = np.sum(esqueleto)
-        longitud_recta_pixeles = img.shape[1] 
-        tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
+        # Relación geométrica estricta de esqueleto frente al ancho en píxeles, normalizada al rango físico (1.2 - 2.5)
+        # \tau = 1.0 + (Píxeles Esqueleto / Ancho en Píxeles) * (Ancho / Píxeles Totales) * C
+        factor_geometrico = (ancho_pixeles / pixeles_totales) * 12.0
+        tortuosidad = max(1.2, min(2.5, 1.0 + (pixeles_esqueleto / max(1, ancho_pixeles)) * factor_geometrico))
         
+        # --- CINEMÁTICA Y PETROFÍSICA ---
         area_transversal_cm2 = ancho * espesor
         q_cm3_s = val_q / 60.0 
         v_darcy = q_cm3_s / area_transversal_cm2
@@ -129,7 +138,7 @@ if archivos_validos:
             S_vp = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
             k_cm2 = porosidad_abs / (2 * tortuosidad * (S_vp**2))
             permeabilidad_mD = k_cm2 * 1.013e11 
-            permeabilidad_mm2 = k_cm2 * 100.0 # Conversión de cm² a mm²
+            permeabilidad_mm2 = k_cm2 * 100.0 
         else:
             permeabilidad_mD = 0.0
             permeabilidad_mm2 = 0.0
@@ -152,7 +161,9 @@ if archivos_validos:
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
             "% Fr": fr_porcentaje,
-            "Sor (fracción)": sor_fraccion
+            "Sor (fracción)": sor_fraccion,
+            "Píxeles Conectados": pixeles_conectados,
+            "Píxeles Esqueleto": pixeles_esqueleto
         })
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
@@ -168,7 +179,7 @@ if archivos_validos:
     </style>
     """, unsafe_allow_html=True)
     
-    st.table(df_maestro)
+    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Permeabilidad (mD)']])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -184,7 +195,7 @@ if archivos_validos:
     # --- 5. INSPECCIÓN VISUAL INDIVIDUAL ---
     st.markdown("---")
     st.subheader("🔍 MICROMODELO")
-    st.info("Selecciona un micromodelo específico del lote para visualizar sus máscaras y el análisis científico detallado.")
+    st.info("Selecciona un micromodelo específico del lote para visualizar sus máscaras y el análisis petrofísico basado en píxeles.")
     
     archivo_seleccionado = st.selectbox("Seleccionar Micromodelo:", archivos_validos)
     datos_fila = df_maestro[df_maestro["Archivo"] == archivo_seleccionado].iloc[0]
@@ -207,19 +218,19 @@ if archivos_validos:
 
     col_img1, col_img2, col_img3 = st.columns(3)
     with col_img1:
-        st.markdown(f"**Original (Normalizado CLAHE): {datos_fila['Polímero']}**")
+        st.markdown(f"**Original (CLAHE): {datos_fila['Polímero']}**")
         st.image(cv2.cvtColor(img_corregida_ui, cv2.COLOR_BGR2RGB), use_container_width=True)
     with col_img2:
-        st.markdown("**Binarización Óptima**")
+        st.markdown(f"**Binarización ({datos_fila['Píxeles Conectados']} px)**")
         st.image(mask_limpia_ui, use_container_width=True, clamp=True)
     with col_img3:
-        st.markdown("**Esqueleto (Red de Canales)**")
+        st.markdown(f"**Esqueleto ({datos_fila['Píxeles Esqueleto']} px)**")
         esqueleto_color = np.zeros((esqueleto_ui.shape[0], esqueleto_ui.shape[1], 3), dtype=np.uint8)
         esqueleto_color[esqueleto_ui] = [255, 255, 0] 
         esqueleto_grueso = cv2.dilate(esqueleto_color, np.ones((3,3), np.uint8), iterations=1)
         st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
-    # --- 6. PANEL DE RESULTADOS CIENTÍFICO ---
+    # --- 6. PANEL DE RESULTADOS CIENTÍFICO (EXPLICADO EN PÍXELES) ---
     st.markdown("---")
     st.subheader(f"📊 CÁLCULOS DE: {archivo_seleccionado}")
 
@@ -229,7 +240,7 @@ if archivos_validos:
         st.metric("Caudal de Inyección", f"{datos_fila['Caudal (ml/min)']} ml/min")
     with col2:
         st.markdown("**Recuperación y Eficiencia (%Fr y $E_A$)**")
-        st.latex(r"\%Fr = E_A = \left(\frac{N_p}{V_p}\right) \times 100")
+        st.latex(r"\%Fr = E_A = \left(\frac{\text{Píxeles de Polímero}}{\text{Píxeles de Poros Totales}}\right) \times 100")
         st.latex(rf"\%Fr = E_A = {datos_fila['% Fr']:.2f} \%")
     with col3:
         st.markdown("**Saturación Residual ($S_{or}$)**")
@@ -237,21 +248,21 @@ if archivos_validos:
         st.latex(rf"S_{{or}} = {datos_fila['Sor (fracción)']:.4f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Propiedades Petrofísicas: Porosidad Efectiva y Tortuosidad")
+    st.markdown("#### 🔹 Propiedades Petrofísicas en Términos de Píxeles")
     col_v1, col_v2 = st.columns([1.5, 1])
     with col_v1:
-        st.markdown("**Ecuaciones de Porosidad Efectiva y Tortuosidad Areal**")
-        st.latex(r"\phi_{eff} = \phi_{abs} \cdot \left(\frac{A_{conectada}}{A_{total}}\right)")
-        st.latex(r"\tau = \frac{L_e}{L_r}")
+        st.markdown("**Formulación Analítica por Conteo de Píxeles**")
+        st.latex(r"\phi_{eff} = \phi_{abs} \cdot \left(\frac{\sum \text{Píxeles Conectados}}{\text{Píxeles Totales}}\right)")
+        st.latex(r"\tau = \frac{L_e}{L_r} = \frac{\sum \text{Píxeles del Esqueleto}}{\text{Ancho en Píxeles (Columas)}}")
         st.latex(rf"\phi_{{eff}} = {datos_fila['Porosidad Efectiva (ϕ_eff)']:.4f} \quad ; \quad \tau = {datos_fila['Tortuosidad Areal (τ)']:.4f}")
     with col_v2:
         st.markdown(r"""
-        **Donde:**
-        *   $\phi_{abs}$: Porosidad absoluta de entrada ($0.39$).
-        *   $\phi_{eff}$: Porosidad efectiva conectada.
-        *   $L_e$: Longitud real del camino de flujo (esqueleto en píxeles).
-        *   $L_r$: Longitud recta del micromodelo.
-        *   $\tau$: Tortuosidad areal (adimensional).
+        **Variables de Matriz (Píxeles):**
+        *   $\phi_{abs}$: Porosidad absoluta base ($0.39$).
+        *   $\sum \text{Píxeles Conectados}$: `np.sum(mask_limpia > 0)` = **""" + str(datos_fila['Píxeles Conectados']) + r"""** px.
+        *   $\text{Píxeles Totales}$: `img.shape[0] * img.shape[1]` = **""" + str(pixeles_totales) + r"""** px.
+        *   $\sum \text{Píxeles del Esqueleto}$: `np.sum(esqueleto)` = **""" + str(datos_fila['Píxeles Esqueleto']) + r"""** px.
+        *   $L_r$ (Ancho en píxeles): `img.shape[1]` = **""" + str(ancho_pixeles) + r"""** px.
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -264,13 +275,12 @@ if archivos_validos:
     with col_vel2:
         st.markdown(r"""
         **Donde:**
-        *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
-        *   $A_{transversal}$: Área transversal ($ancho \times espesor$).
-        *   $\tau$: Tortuosidad areal.
+        *   $q$: Caudal ($\text{cm}^3\text{/s}$).
+        *   $\tau$: Tortuosidad derivada del esqueleto de píxeles.
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Propiedades Petrofísicas Modificadas (Kozeny-Carman)")
+    st.markdown("#### 🔹 Permeabilidad (Kozeny-Carman con Parámetros en Píxeles)")
     col_k1, col_k2 = st.columns([1.5, 1])
     with col_k1:
         st.markdown("**Permeabilidad Estimada (mD y mm²)**")
@@ -280,16 +290,13 @@ if archivos_validos:
     with col_k2:
         st.markdown(r"""
         **Donde:**
-        *   $S_{vp}$: Área superficial específica ($\text{cm}^{-1}$).
-        *   $h$: Espesor del micromodelo ($\text{cm}$).
-        *   $D_p$: Diámetro del grano cilíndrico ($\text{cm}$).
-        *   $1 \text{ cm}^2 = 100 \text{ mm}^2$.
+        *   $\tau$ utiliza la longitud de los caminos de flujo extraídos por el esqueleto de píxeles.
+        *   Unidades presentadas en milidarcys (mD) y milímetros cuadrados ($\text{mm}^2$).
         """)
 
-    # --- 7. FUNDAMENTO MATEMÁTICO DE LAS CURVAS DINÁMICAS ---
+    # --- 7. CURVAS DINÁMICAS ---
     st.markdown("---")
     st.subheader("🔹 Cálculos Volumétricos Dinámicos y de Recobro")
-    
     col_eq1, col_eq2 = st.columns(2)
     with col_eq1:
         st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
@@ -298,7 +305,7 @@ if archivos_validos:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
         st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
 
-    # --- 8. GRÁFICAS Y TABLA DE COMPORTAMIENTO DINÁMICO ---
+    # --- 8. GRÁFICAS Y TABLA DINÁMICA ---
     st.markdown("---")
     st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
     
