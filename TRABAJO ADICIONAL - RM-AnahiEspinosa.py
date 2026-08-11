@@ -49,11 +49,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Calibración Óptica Automatizada Activada.")
+st.sidebar.success("🤖 Calibración Óptica Automatizada Activada (Sin Restricciones).")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE ---
+# --- 3. PROCESAMIENTO EN BUCLE (SIN LÍMITES ARTIFICIALES) ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -92,10 +92,7 @@ if archivos_validos:
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
         pixeles_polimero = np.sum(mask_limpia == 255)
-        
-        # Corrección estricta: La fracción real no puede superar el espacio poroso y se escala de forma realista
-        fraccion_detectada = pixeles_polimero / pixeles_totales
-        eficiencia_barrido = min(0.75, fraccion_detectada / (porosidad_abs * 1.5)) # Factor realista de área barrida máxima en micromodelos (~70-75%)
+        fraccion_polimero_total = pixeles_polimero / pixeles_totales 
         
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
@@ -110,9 +107,12 @@ if archivos_validos:
         v_intersticial = v_darcy / porosidad_abs if porosidad_abs > 0 else 0
         velocidad_real = v_intersticial * tortuosidad 
         
+        # Volúmenes Geométricos Fijos
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
+        # Eficiencia Areal basada puramente en la lectura óptica de píxeles
+        eficiencia_barrido = fraccion_polimero_total / porosidad_abs if porosidad_abs > 0 else 0
         area_barrida_cm2 = eficiencia_barrido * area_total_cm2
         
         if eficiencia_barrido > 0 and tortuosidad > 0:
@@ -122,13 +122,14 @@ if archivos_validos:
         else:
             permeabilidad_mD = 0.0
 
-        # Cálculos volumétricos ajustados a la realidad de la tesis (Máximo ~30% de recuperación en micromodelos)
-        Np_ml = area_barrida_cm2 * espesor * porosidad_abs * 0.35 
+        # Cálculo volumétrico real de Np en ml
+        Np_ml = area_barrida_cm2 * espesor * porosidad_abs
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
+        # Cálculos puros de Recuperación (%Fr) y Saturación Residual (Sor)
         fr_porcentaje = (Np_ml / Vp_ml) * 100 if Vp_ml > 0 else 0
-        sor_fraccion = max(0.20, 1.0 - (fr_porcentaje / 100.0)) # El Sor nunca baja de 0.20 (20% de aceite residual típico)
+        sor_fraccion = 1.0 - (fr_porcentaje / 100.0)
 
         datos_consolidados.append({
             "Archivo": nombre_archivo,
@@ -315,7 +316,7 @@ if archivos_validos:
         st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
         st.line_chart(datos_grafica, x="VPI", y="Np (ml)", color="#3498DB")
         
-    with st.expander("Ver Techo de Producción Estimada"):
+    with st.expander("Ver Tabla de Datos de Producción Estimada"):
         st.dataframe(datos_grafica.style.format({
             "Tiempo (min)": "{:.0f}",
             "Np (ml)": "{:.2f}",
