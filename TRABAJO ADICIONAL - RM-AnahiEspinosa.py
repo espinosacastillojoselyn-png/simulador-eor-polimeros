@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación EOR: Permeabilidad Comparativa y Análisis Dinámico")
+st.title("Evaluación EOR: Permeabilidad Comparativa en mm² y Darcys")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -46,7 +46,7 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Kozeny-Carman Dual (Absoluta vs Efectiva) en mm² Activo.")
+st.sidebar.success("🤖 Kozeny-Carman Dual (mm² y Darcys) Activo.")
 
 datos_consolidados = []
 
@@ -126,20 +126,24 @@ if archivos_validos:
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
-        # --- CÁLCULO DUAL DE PERMEABILIDAD EN mm² (Absoluta vs Efectiva) ---
+        # --- CÁLCULO DUAL DE PERMEABILIDAD (Absoluta vs Efectiva) en mm² y Darcys ---
         if eficiencia_barrido > 0 and tortuosidad > 0:
             # 1. Con Porosidad Absoluta (ϕ_abs)
             S_vp_abs = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
             k_cm2_abs = porosidad_abs / (2 * tortuosidad * (S_vp_abs**2))
             permeabilidad_mm2_abs = k_cm2_abs * 100.0
+            permeabilidad_darcy_abs = k_cm2_abs * 1.01325e8
             
             # 2. Con Porosidad Efectiva (ϕ_eff)
             S_vp_eff = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
             k_cm2_eff = porosidad_efectiva / (2 * tortuosidad * (S_vp_eff**2))
             permeabilidad_mm2_eff = k_cm2_eff * 100.0
+            permeabilidad_darcy_eff = k_cm2_eff * 1.01325e8
         else:
             permeabilidad_mm2_abs = 0.0
+            permeabilidad_darcy_abs = 0.0
             permeabilidad_mm2_eff = 0.0
+            permeabilidad_darcy_eff = 0.0
 
         Np_ml = eficiencia_barrido * Vp_ml
         V_iny_ml = val_q * t_bt
@@ -152,10 +156,10 @@ if archivos_validos:
             "Caudal (ml/min)": val_q,
             "Porosidad Efectiva (ϕ_eff)": porosidad_efectiva,
             "Tortuosidad Areal (τ)": tortuosidad,
-            "Velocidad Real (cm/s)": velocidad_real,
-            "Eficiencia Barrido EA (%)": fr_porcentaje,
-            "Perm. Absoluta (mm²)": permeabilidad_mm2_abs,
-            "Perm. Efectiva (mm²)": permeabilidad_mm2_eff,
+            "Perm. Abs. (mm²)": permeabilidad_mm2_abs,
+            "Perm. Abs. (Darcy)": permeabilidad_darcy_abs,
+            "Perm. Efec. (mm²)": permeabilidad_mm2_eff,
+            "Perm. Efec. (Darcy)": permeabilidad_darcy_eff,
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
             "% Fr": fr_porcentaje,
@@ -177,7 +181,7 @@ if archivos_validos:
     </style>
     """, unsafe_allow_html=True)
     
-    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Perm. Absoluta (mm²)', 'Perm. Efectiva (mm²)']])
+    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Perm. Abs. (mm²)', 'Perm. Efec. (mm²)']])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -278,20 +282,20 @@ if archivos_validos:
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Permeabilidad Comparativa (Kozeny-Carman en mm²)")
+    st.markdown("#### 🔹 Permeabilidad Comparativa (Kozeny-Carman en mm² y Darcys)")
     
     col_k1, col_k2 = st.columns(2)
     with col_k1:
         st.markdown("**1. Permeabilidad con Porosidad Absoluta ($k_{abs}$)**")
         st.latex(r"k_{abs} = \frac{\phi_{abs}}{2 \cdot \tau \cdot S_{vp(abs)}^2}")
-        st.latex(rf"k_{{abs}} = {datos_fila['Perm. Absoluta (mm²)']:.4f} \text{{ mm}}^2")
+        st.latex(rf"k_{{abs}} = {datos_fila['Perm. Abs. (mm²)']:.4f} \text{{ mm}}^2 \quad (\approx {datos_fila['Perm. Abs. (Darcy)']:.2f} \text{{ D}})")
     with col_k2:
         st.markdown("**2. Permeabilidad con Porosidad Efectiva ($k_{eff}$)**")
         st.latex(r"k_{eff} = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp(eff)}^2}")
-        st.latex(rf"k_{{eff}} = {datos_fila['Perm. Efectiva (mm²)']:.4f} \text{{ mm}}^2")
+        st.latex(rf"k_{{eff}} = {datos_fila['Perm. Efec. (mm²)']:.4f} \text{{ mm}}^2 \quad (\approx {datos_fila['Perm. Efec. (Darcy)']:.2f} \text{{ D}})")
 
     st.markdown("""
-    > **Nota para la revisión del docente:** La diferencia entre $k_{abs}$ y $k_{eff}$ permite evaluar cuantitativamente el impacto de la conectividad de los canales porosos extraídos por visión artificial frente a la porosidad teórica del medio.
+    > **Nota para la revisión del docente:** La presentación simultánea en $\text{mm}^2$ y Darcys permite comparar la permeabilidad teórica basada en la matriz granular frente a la efectiva obtenida mediante binarización óptica.
     """)
 
     # --- 7. CURVAS DINÁMICAS ---
