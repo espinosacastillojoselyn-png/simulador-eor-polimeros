@@ -131,6 +131,14 @@ if archivos_validos:
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
+        # --- NUEVOS CÁLCULOS SOLICITADOS (%Fr y Sor) ---
+        # Porcentaje de Recuperación (%Fr) = (Np / Vp) * 100
+        fr_porcentaje = (Np_ml / Vp_ml) * 100 if Vp_ml > 0 else 0
+        
+        # Saturación de Petróleo Residual (Sor) asumiendo Soi = 1 (100% de saturación inicial)
+        # Sor = Soi - (Fracción recuperada) -> Expresado en fracción o porcentaje
+        sor_fraccion = max(0.0, 1.0 - (fr_porcentaje / 100.0))
+
         datos_consolidados.append({
             "Archivo": nombre_archivo,
             "Polímero": tipo_polimero,
@@ -141,7 +149,9 @@ if archivos_validos:
             "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
             "Permeabilidad Mod. (mD)": permeabilidad_mD,
             "Np al BT (ml)": Np_ml,
-            "VPI al BT": VPI_bt
+            "VPI al BT": VPI_bt,
+            "% Fr": fr_porcentaje,
+            "Sor (fracción)": sor_fraccion
         })
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
@@ -212,13 +222,13 @@ if archivos_validos:
         st.metric("Fluido Inyectado", f"{datos_fila['Polímero']} {datos_fila['Concentración (ppm)']} ppm")
         st.metric("Caudal de Inyección", f"{datos_fila['Caudal (ml/min)']} ml/min")
     with col2:
-        st.markdown("**Eficiencia de Barrido Areal (EA)**")
-        st.latex(r"E_A = \frac{A_B}{A_T} \times 100")
-        st.latex(rf"E_A = {datos_fila['Eficiencia Barrido EA (%)']:.2f} \%")
+        st.markdown("**Porcentaje de Recuperación (%Fr)**")
+        st.latex(r"\%Fr = \left(\frac{N_p}{V_p}\right) \times 100")
+        st.latex(rf"\%Fr = {datos_fila['% Fr']:.2f} \%")
     with col3:
-        st.markdown("**Tortuosidad Areal (τ)**")
-        st.latex(r"\tau = \frac{L_e}{L_r}")
-        st.latex(rf"\tau = {datos_fila['Tortuosidad Areal (τ)']:.4f}")
+        st.markdown("**Saturación Residual ($S_{or}$)**")
+        st.latex(r"S_{or} = 1.0 - \left(\frac{\%Fr}{100}\right)")
+        st.latex(rf"S_{{or}} = {datos_fila['Sor (fracción)']:.4f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔹 Cinemática del Fluido (Velocidades)")
@@ -336,5 +346,5 @@ st.markdown("""
 **Aplicación en este software:**
 * **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
 * **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
-* **Recuperación Dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico (*shear thinning/thickening*) de la Goma Xántica y la HPAM.
+* **Recuperación Dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
 """)
