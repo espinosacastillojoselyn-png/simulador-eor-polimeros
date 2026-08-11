@@ -33,12 +33,16 @@ else:
 
 # --- 2. INGRESO DE PARÁMETROS GLOBALES ---
 st.sidebar.header("📝 2. Parámetros Físicos")
-st.sidebar.info("Para replicar la Tesis, usa Ancho = 180 mm y Espesor = 0.8 mm")
+st.sidebar.info("Dimensiones estándar del Micromodelo de la Tesis (Ancho 180, Largo 200, Espesor 0.8)")
 
+# DIMENSIONES EXACTAS DEL MODELO FÍSICO
 ancho_mm = st.sidebar.number_input("Ancho del Micromodelo (mm)", value=180.00)
 ancho = ancho_mm / 10.0 # cm
+largo_mm = st.sidebar.number_input("Largo del Micromodelo (mm)", value=200.00)
+largo_cm = largo_mm / 10.0 # cm
 espesor_mm = st.sidebar.number_input("Espesor del Micromodelo (mm)", value=0.800, format="%.3f")
 espesor = espesor_mm / 10.0 # cm
+
 Dp_cm_input = st.sidebar.number_input("Tamaño del Grano (mm)", value=3.00, format="%.3f") 
 Dp_cm = Dp_cm_input / 10.0 # cm
 porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_value=0.01, max_value=1.0, value=0.39)
@@ -88,12 +92,10 @@ if archivos_validos:
         mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
+        # Fracción del volumen total que es polímero
         pixeles_polimero = np.sum(mask_limpia == 255)
-        porosidad_efectiva = pixeles_polimero / pixeles_totales 
+        fraccion_polimero_total = pixeles_polimero / pixeles_totales 
         
-        if porosidad_efectiva >= porosidad_abs:
-            porosidad_efectiva = porosidad_abs * 0.95
-            
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
         
@@ -101,34 +103,31 @@ if archivos_validos:
         longitud_recta_pixeles = img.shape[1] 
         tortuosidad = max(1.0, longitud_camino_pixeles / longitud_recta_pixeles)
         
-        q_cm3_s = val_q / 60.0 
+        # Cinemática
         area_transversal_cm2 = ancho * espesor
+        q_cm3_s = val_q / 60.0 
         v_darcy = q_cm3_s / area_transversal_cm2
-        v_intersticial = v_darcy / porosidad_efectiva if porosidad_efectiva > 0 else 0
+        v_intersticial = v_darcy / porosidad_abs if porosidad_abs > 0 else 0
         velocidad_real = v_intersticial * tortuosidad 
         
-        longitud_calculada = ancho * (img.shape[1] / img.shape[0])
-        area_total_vista_superior = ancho * longitud_calculada
-        area_barrida_cm2 = porosidad_efectiva * area_total_vista_superior    
-        eficiencia_barrido = min(1.0, porosidad_efectiva / porosidad_abs) if porosidad_abs > 0 else 0
-
-        if porosidad_efectiva > 0 and tortuosidad > 0:
-            S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
-            k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
+        # Volúmenes Geométricos Fijos
+        area_total_cm2 = ancho * largo_cm
+        Vp_ml = area_total_cm2 * espesor * porosidad_abs
+        
+        # Eficiencia Areal (Área polímero / Área de poros)
+        eficiencia_barrido = min(1.0, fraccion_polimero_total / porosidad_abs) if porosidad_abs > 0 else 0
+        area_barrida_cm2 = eficiencia_barrido * area_total_cm2
+        
+        # Permeabilidad de Kozeny-Carman
+        if fraccion_polimero_total > 0 and tortuosidad > 0:
+            S_vp = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
+            k_cm2 = porosidad_abs / (2 * tortuosidad * (S_vp**2))
             permeabilidad_mD = k_cm2 * 1.013e11 
         else:
             permeabilidad_mD = 0.0
 
-        # --- NUEVOS CÁLCULOS VOLUMÉTRICOS EN MILILITROS (1 cm³ = 1 ml) ---
-        largo_cm = ancho * (img.shape[1] / img.shape[0])
-        area_total_cm2 = ancho * largo_cm
-        area_barrida_cm2 = porosidad_efectiva * area_total_cm2
-        
-        # Volumen en cm³ (ml)
-        Vp_ml = area_total_cm2 * espesor * porosidad_abs
-        Np_ml = area_barrida_cm2 * espesor * porosidad_abs
-        
-        # Volumen Inyectado al BT en ml
+        # Cálculo dinámico final de volumen recuperado (Np)
+        Np_ml = fraccion_polimero_total * area_total_cm2 * espesor
         V_iny_ml = val_q * t_bt
         VPI_bt = V_iny_ml / Vp_ml if Vp_ml > 0 else 0
 
@@ -137,13 +136,11 @@ if archivos_validos:
             "Polímero": tipo_polimero,
             "Concentración (ppm)": val_ppm,
             "Caudal (ml/min)": val_q,
-            "Porosidad Efectiva (%)": porosidad_efectiva * 100,
             "Tortuosidad Areal (τ)": tortuosidad,
             "Velocidad Real (cm/s)": velocidad_real,
-            "Área Barrida (cm²)": area_barrida_cm2,
             "Eficiencia Barrido EA (%)": eficiencia_barrido * 100,
             "Permeabilidad Mod. (mD)": permeabilidad_mD,
-            "Np al BT (ml)": Np_ml,  # <-- Título corregido en la tabla maestra
+            "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt
         })
 
@@ -215,9 +212,9 @@ if archivos_validos:
         st.metric("Fluido Inyectado", f"{datos_fila['Polímero']} {datos_fila['Concentración (ppm)']} ppm")
         st.metric("Caudal de Inyección", f"{datos_fila['Caudal (ml/min)']} ml/min")
     with col2:
-        st.markdown("**Porosidad Efectiva**")
-        st.latex(r"\phi_{eff} = \frac{Píxeles_{polímero}}{Píxeles_{Totales}}")
-        st.latex(rf"\phi_{{eff}} = {datos_fila['Porosidad Efectiva (%)']:.1f} \%")
+        st.markdown("**Eficiencia de Barrido Areal (EA)**")
+        st.latex(r"E_A = \frac{A_B}{A_T} \times 100")
+        st.latex(rf"E_A = {datos_fila['Eficiencia Barrido EA (%)']:.2f} \%")
     with col3:
         st.markdown("**Tortuosidad Areal (τ)**")
         st.latex(r"\tau = \frac{L_e}{L_r}")
@@ -228,43 +225,31 @@ if archivos_validos:
     col_v1, col_v2 = st.columns([1.5, 1])
     with col_v1:
         st.markdown("**Velocidad Real del Polímero**")
-        st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{eff}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
+        st.latex(r"v_{Darcy} = \frac{q}{A_{transversal}} \quad ; \quad v_{int} = \frac{v_{Darcy}}{\phi_{abs}} \quad ; \quad v_{real} = v_{int} \cdot \tau")
         st.latex(rf"v_{{real}} = {datos_fila['Velocidad Real (cm/s)']:.6f} \text{{ cm/s}}")
     with col_v2:
         st.markdown(r"""
         **Donde:**
         *   $q$: Caudal de inyección ($\text{cm}^3\text{/s}$).
         *   $A_{transversal}$: Área transversal ($ancho \times espesor$).
-        *   $\phi_{eff}$: Porosidad efectiva (fracción).
+        *   $\phi_{abs}$: Porosidad absoluta (fracción).
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Eficiencia de Barrido y Geometría")
-    col_a, col_b, col_c = st.columns(3)
-    with col_b:
-        st.markdown("**Área Real Barrida**")
-        st.latex(r"A_B = A_T \cdot \left(\frac{Píxeles_{polímero}}{Píxeles_{Totales}}\right)")
-        st.latex(rf"A_B = {datos_fila['Área Barrida (cm²)']:.4f} \text{{ cm}}^2")
-    with col_c:
-        st.markdown("**Eficiencia de Barrido Areal (EA)**")
-        st.latex(r"E_A = \frac{A_B}{A_T} \times 100")
-        st.latex(rf"E_A = {datos_fila['Eficiencia Barrido EA (%)']:.2f} \%")
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("#### 🔹 Propiedades Petrofísicas Modificadas")
     col_k1, col_k2 = st.columns([1.5, 1])
     with col_k1:
         st.markdown("**Permeabilidad Estimada - Modelo de Kozeny-Carman Modificado**")
-        st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
-        st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
+        st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{abs})}{\phi_{abs} \cdot D_p}")
+        st.latex(r"k = \frac{\phi_{abs}}{2 \cdot \tau \cdot S_{vp}^2}")
         st.latex(rf"k = {datos_fila['Permeabilidad Mod. (mD)']:.2f} \text{{ mD}}")
     with col_k2:
         st.markdown(r"""
         **Donde:**
         *   $S_{vp}$: Área superficial específica ($\text{cm}^{-1}$).
         *   $h$: Espesor del micromodelo ($\text{cm}$).
-        *   $\phi_{eff}$: Porosidad efectiva (fracción).
+        *   $\phi_{abs}$: Porosidad absoluta (fracción).
         *   $D_p$: Diámetro del grano cilíndrico ($\text{cm}$).
         *   $\tau$: Tortuosidad areal (adimensional).
         """)
@@ -288,7 +273,6 @@ if archivos_validos:
         
     with col_eq2:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
-        # Se quitó el texto y la ecuación con el factor de 1000
         st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico:")
         st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
         st.markdown(r"""
@@ -311,7 +295,6 @@ if archivos_validos:
     np_array = Np_final * ((tiempos / t_bt) ** 0.85)
     vpi_array = VPI_final * (tiempos / t_bt)
     
-    # Volumen inyectado en mililitros (ml)
     v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
     
     datos_grafica = pd.DataFrame({
