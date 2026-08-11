@@ -75,11 +75,10 @@ if archivos_validos:
         if img is None:
             continue
             
-        # --- EXTRACCIÓN DE DIMENSIONES Y MATRICES EN PÍXELES ---
         pixeles_totales = int(img.shape[0] * img.shape[1])
-        ancho_pixeles = int(img.shape[1]) # L_r (Longitud recta de referencia en píxeles)
+        ancho_pixeles = int(img.shape[1]) 
         
-        # Pre-procesamiento CLAHE para eliminar viñeteo lumínico
+        # Pre-procesamiento CLAHE
         lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
@@ -90,7 +89,6 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img_corregida, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
-        # Filtro HSV estricto
         lower_blue = np.array([95, 70, 70])
         upper_blue = np.array([135, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -99,32 +97,24 @@ if archivos_validos:
         mask_limpia = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask_limpia = cv2.morphologyEx(mask_limpia, cv2.MORPH_CLOSE, kernel)
         
-        # --- CONTEOS DE PÍXELES PURAMENTE DIGITALES ---
-        pixeles_polimero = int(np.sum(mask_limpia == 255)) # Píxeles barridos por el polímero
-        pixeles_conectados = int(np.sum(mask_limpia > 0)) # Píxeles totales de canales abiertos conectados
+        pixeles_polimero = int(np.sum(mask_limpia == 255))
+        pixeles_conectados = int(np.sum(mask_limpia > 0))
         
-        # 1. Porosidad Efectiva en función de píxeles
-        # \phi_{eff} = \phi_{abs} * (Píxeles Conectados / Píxeles Totales)
         fraccion_area_conectada = pixeles_conectados / pixeles_totales if pixeles_totales > 0 else 0
         porosidad_efectiva = float(porosidad_abs * fraccion_area_conectada)
         
-        # 2. Eficiencia de Barrido Areal y Recuperación en función de píxeles
         pixeles_poros_totales = pixeles_totales * porosidad_abs
         fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
         eficiencia_barrido = fr_porcentaje / 100.0
         sor_fraccion = max(0.0, 1.0 - eficiencia_barrido)
         
-        # 3. Tortuosidad Areal basada en Esqueleto de Píxeles
         bool_mask = mask_limpia > 0
         esqueleto = skeletonize(bool_mask) 
-        pixeles_esqueleto = int(np.sum(esqueleto)) # L_e (Longitud real del camino en píxeles)
+        pixeles_esqueleto = int(np.sum(esqueleto))
         
-        # Relación geométrica estricta de esqueleto frente al ancho en píxeles, normalizada al rango físico (1.2 - 2.5)
-        # \tau = 1.0 + (Píxeles Esqueleto / Ancho en Píxeles) * (Ancho / Píxeles Totales) * C
         factor_geometrico = (ancho_pixeles / pixeles_totales) * 12.0
         tortuosidad = max(1.2, min(2.5, 1.0 + (pixeles_esqueleto / max(1, ancho_pixeles)) * factor_geometrico))
         
-        # --- CINEMÁTICA Y PETROFÍSICA ---
         area_transversal_cm2 = ancho * espesor
         q_cm3_s = val_q / 60.0 
         v_darcy = q_cm3_s / area_transversal_cm2
@@ -230,7 +220,7 @@ if archivos_validos:
         esqueleto_grueso = cv2.dilate(esqueleto_color, np.ones((3,3), np.uint8), iterations=1)
         st.image(esqueleto_grueso, use_container_width=True, clamp=True)
 
-    # --- 6. PANEL DE RESULTADOS CIENTÍFICO (EXPLICADO EN PÍXELES) ---
+    # --- 6. PANEL DE RESULTADOS CIENTÍFICO ---
     st.markdown("---")
     st.subheader(f"📊 CÁLCULOS DE: {archivo_seleccionado}")
 
@@ -253,16 +243,16 @@ if archivos_validos:
     with col_v1:
         st.markdown("**Formulación Analítica por Conteo de Píxeles**")
         st.latex(r"\phi_{eff} = \phi_{abs} \cdot \left(\frac{\sum \text{Píxeles Conectados}}{\text{Píxeles Totales}}\right)")
-        st.latex(r"\tau = \frac{L_e}{L_r} = \frac{\sum \text{Píxeles del Esqueleto}}{\text{Ancho en Píxeles (Columas)}}")
+        st.latex(r"\tau = \frac{L_e}{L_r} = \frac{\sum \text{Píxeles del Esqueleto}}{\text{Ancho en Píxeles (Columnas)}}")
         st.latex(rf"\phi_{{eff}} = {datos_fila['Porosidad Efectiva (ϕ_eff)']:.4f} \quad ; \quad \tau = {datos_fila['Tortuosidad Areal (τ)']:.4f}")
     with col_v2:
         st.markdown(r"""
         **Variables de Matriz (Píxeles):**
         *   $\phi_{abs}$: Porosidad absoluta base ($0.39$).
-        *   $\sum \text{Píxeles Conectados}$: `np.sum(mask_limpia > 0)` = **""" + str(datos_fila['Píxeles Conectados']) + r"""** px.
-        *   $\text{Píxeles Totales}$: `img.shape[0] * img.shape[1]` = **""" + str(pixeles_totales) + r"""** px.
-        *   $\sum \text{Píxeles del Esqueleto}$: `np.sum(esqueleto)` = **""" + str(datos_fila['Píxeles Esqueleto']) + r"""** px.
-        *   $L_r$ (Ancho en píxeles): `img.shape[1]` = **""" + str(ancho_pixeles) + r"""** px.
+        *   $\sum \text{Píxeles Conectados}$: **""" + str(datos_fila['Píxeles Conectados']) + r"""** px.
+        *   $\text{Píxeles Totales}$: **""" + str(pixeles_totales) + r"""** px.
+        *   $\sum \text{Píxeles del Esqueleto}$: **""" + str(datos_fila['Píxeles Esqueleto']) + r"""** px.
+        *   $L_r$ (Ancho en píxeles): **""" + str(ancho_pixeles) + r"""** px.
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -305,9 +295,9 @@ if archivos_validos:
         st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
         st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
 
-    # --- 8. GRÁFICAS Y TABLA DINÁMICA ---
+    # --- 8. GRÁFICAS MÚLTIPLES DE COMPORTAMIENTO DINÁMICO ---
     st.markdown("---")
-    st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
+    st.subheader(f"📈 Análisis Dinámico y Comportamiento al Breakthrough: {archivo_seleccionado}")
     
     Np_final = datos_fila['Np al BT (ml)']
     VPI_final = datos_fila['VPI al BT']
@@ -331,13 +321,27 @@ if archivos_validos:
         "Sor (fracción)": sor_array
     })
     
+    # Bloque de 4 Gráficos Organizados en Columnas
     col_g1, col_g2 = st.columns(2)
     with col_g1:
-        st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
+        st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
         st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (ml)", color="#2ECC71")
+        
+        st.markdown("**3. Recuperación vs Tiempo (%Fr vs $t$)**")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="% Fr", color="#E67E22")
+        
+        st.markdown("**5. Saturación Residual vs Tiempo ($S_{or}$ vs $t$)**")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="Sor (fracción)", color="#E74C3C")
+        
     with col_g2:
-        st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
+        st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
         st.line_chart(datos_grafica, x="VPI", y="Np (ml)", color="#3498DB")
+        
+        st.markdown("**4. Recuperación vs VPI (%Fr vs VPI)**")
+        st.line_chart(datos_grafica, x="VPI", y="% Fr", color="#9B59B6")
+        
+        st.markdown("**6. Relación de Producción y Recobro ($N_p$ vs %Fr)**")
+        st.line_chart(datos_grafica, x="% Fr", y="Np (ml)", color="#1ABC9C")
         
     with st.expander("Ver Tabla de Datos de Producción Estimada con %Fr y Sor"):
         st.dataframe(datos_grafica.style.format({
