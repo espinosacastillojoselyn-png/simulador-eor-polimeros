@@ -49,7 +49,7 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Balance de Masas y Dinámica Temporal Activos.")
+st.sidebar.success("🤖 Balance de Masas por Píxeles Activo.")
 
 datos_consolidados = []
 
@@ -83,6 +83,7 @@ if archivos_validos:
         img_suavizada = cv2.GaussianBlur(img, (5, 5), 0)
         hsv = cv2.cvtColor(img_suavizada, cv2.COLOR_BGR2HSV)
         
+        # Filtro HSV estricto para azul real de polímero
         lower_blue = np.array([100, 120, 100])
         upper_blue = np.array([130, 255, 255])
         mask = cv2.inRange(hsv, lower_blue, upper_blue)
@@ -94,8 +95,11 @@ if archivos_validos:
         pixeles_polimero = np.sum(mask_limpia == 255)
         pixeles_poros_totales = pixeles_totales * porosidad_abs
         
+        # Eficiencia Areal / Porcentaje de Recuperación real por píxeles
         fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
         eficiencia_barrido = fr_porcentaje / 100.0
+        
+        # Saturación Residual Real (Sor)
         sor_fraccion = max(0.0, 1.0 - eficiencia_barrido)
         
         bool_mask = mask_limpia > 0
@@ -142,7 +146,7 @@ if archivos_validos:
 
     # --- 4. REPORTE CONSOLIDADO EXCEL ---
     st.markdown("---")
-    st.subheader("📋 RESUMEN RESULTADOS")
+    st.subheader("📋 RESUMEN RESULTADOS (Balance de Masas por Píxeles)")
     df_maestro = pd.DataFrame(datos_consolidados)
     
     st.markdown("""
@@ -252,48 +256,72 @@ if archivos_validos:
 
     # --- 7. FUNDAMENTO MATEMÁTICO DE LAS CURVAS DINÁMICAS ---
     st.markdown("---")
-    st.subheader("🔹 Evolución Dinámica Temporal (%Fr y Sor en función del Tiempo y VPI)")
-    st.write("Simulación de la evolución temporal del desplazamiento basada en la metodología de la Tabla 21 de la Tesis (Herrera Silva, 2020).")
+    st.subheader("🔹 Cálculos Volumétricos Dinámicos y de Recobro")
     
-    fr_final = datos_fila['% Fr']
-    val_q_sel = datos_fila['Caudal (ml/min)']
+    col_eq1, col_eq2 = st.columns(2)
     
-    # Generación de tiempos clave inspirados en la tesis (min)
-    tiempos_tabla = np.array([10, 50, 120, 240, 370, int(t_bt), 930, 1400, 1860, 2330])
+    with col_eq1:
+        st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
+        st.write("Cálculo volumétrico en mililitros (ml) asumiendo $S_{oi} = 1$:")
+        st.latex(r"N_p(t) = A_B(t) \cdot h \cdot \phi_{abs} \cdot S_{oi}")
+        st.markdown(r"""
+        **Donde:**
+        *   $A_B(t)$: Área barrida en el tiempo $t$ ($\text{cm}^2$).
+        *   $h$: Espesor del modelo ($\text{cm}$).
+        *   $\phi_{abs}$: Porosidad absoluta (fracción).
+        """)
+        
+    with col_eq2:
+        st.markdown("**2. Comportamiento de Inyección ($N_p$ vs VPI)**")
+        st.write("Volúmenes Porosos Inyectados calculados con base en el caudal volumétrico:")
+        st.latex(r"VPI(t) = \frac{V_{iny}(t)}{V_p} = \frac{q \cdot t}{V_p}")
+        st.markdown(r"""
+        **Donde:**
+        *   $q$: Caudal de inyección ($\text{ml/min}$).
+        *   $t$: Tiempo transcurrido ($\text{min}$).
+        *   $V_p$: Volumen poroso total ($\text{ml}$).
+        """)
+
+    # --- 8. GRÁFICAS DE COMPORTAMIENTO DINÁMICO (REALISTA) ---
+    st.markdown("---")
+    st.subheader(f"📈 Comportamiento Dinámico Estimado al Breakthrough: {archivo_seleccionado}")
+    st.write("Las gráficas utilizan intervalos discretos de 10 minutos e incorporan un factor de atenuación para simular la pérdida de eficiencia por digitación viscosa.")
     
-    # Cálculo dinámico de VPI y %Fr para cada tiempo temporal
-    area_total_cm2_t = ancho * largo_cm
-    Vp_ml_t = area_total_cm2_t * espesor * porosidad_abs
+    Np_final = datos_fila['Np al BT (ml)']
+    VPI_final = datos_fila['VPI al BT']
     
-    vpi_tabla = (val_q_sel * tiempos_tabla) / Vp_ml_t
+    tiempos = np.arange(0, int(t_bt) + 10, 10)
     
-    # Crecimiento logarítmico/exponencial suave anclado al valor final de la imagen analizada
-    fr_tabla = fr_final * (1.0 - np.exp(-1.5 * (tiempos_tabla / t_bt)))
-    sor_tabla = 1.0 - (fr_tabla / 100.0)
+    np_array = Np_final * ((tiempos / t_bt) ** 0.85)
+    vpi_array = VPI_final * (tiempos / t_bt)
     
-    df_temporal = pd.DataFrame({
-        "Tiempo [min]": tiempos_tabla,
-        "VPI": vpi_tabla,
-        "% Recuperación (%Fr)": fr_tabla,
-        "Sor (fracción)": sor_tabla
+    v_iny_ml_array = datos_fila['Caudal (ml/min)'] * tiempos
+    
+    datos_grafica = pd.DataFrame({
+        "Tiempo (min)": tiempos,
+        "Np (ml)": np_array,
+        "VPI": vpi_array,
+        "Volumen Inyectado (ml)": v_iny_ml_array
     })
     
-    st.dataframe(df_temporal.style.format({
-        "Tiempo [min]": "{:.0f}",
-        "VPI": "{:.2f}",
-        "% Recuperación (%Fr)": "{:.2f}",
-        "Sor (fracción)": "{:.4f}"
-    }), use_container_width=True)
-
-    # Gráficas temporales
     col_g1, col_g2 = st.columns(2)
+    
     with col_g1:
-        st.markdown("**Evolución de Recuperación vs Tiempo**")
-        st.line_chart(df_temporal, x="Tiempo [min]", y="% Recuperación (%Fr)", color="#2ECC71")
+        st.markdown("**Curva de Producción Acumulada ($N_p$ vs $t$)**")
+        st.line_chart(datos_grafica, x="Tiempo (min)", y="Np (ml)", color="#2ECC71")
+        
     with col_g2:
-        st.markdown("**Evolución de Recuperación vs VPI**")
-        st.line_chart(df_temporal, x="VPI", y="% Recuperación (%Fr)", color="#3498DB")
-
+        st.markdown("**Comportamiento de Inyección ($N_p$ vs VPI)**")
+        st.line_chart(datos_grafica, x="VPI", y="Np (ml)", color="#3498DB")
+        
+    with st.expander("Ver Tabla de Datos de Producción Estimada"):
+        st.dataframe(datos_grafica.style.format({
+            "Tiempo (min)": "{:.0f}",
+            "Np (ml)": "{:.2f}",
+            "VPI": "{:.2f}",
+            "Volumen Inyectado (ml)": "{:.2f}"
+        }), use_container_width=True)
+        
 else:
     st.info("Sube las imágenes a la carpeta 'micromodelos' para visualizar los resultados.")
 
@@ -308,5 +336,5 @@ st.markdown("""
 **Aplicación en este software:**
 * **Binarización y Calibración:** Automatización del procesamiento de imágenes (HSV) y conversión de escala (píxeles a mm) documentada en el Capítulo IV.
 * **Cinemática:** Aplicación de las ecuaciones de velocidad de cizallamiento y tortuosidad areal ($\tau$) para modelos desordenados.
-* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) y Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
+* **Recuperación dinámica:** Cálculo estandarizado de Eficiencia de Barrido ($E_A$), Petróleo Recuperado ($N_p$), Porcentaje de Recuperación (%Fr), Saturación Residual ($S_{or}$) and Volúmenes Porosos Inyectados (VPI) validando el comportamiento reológico de los polímeros.
 """)
