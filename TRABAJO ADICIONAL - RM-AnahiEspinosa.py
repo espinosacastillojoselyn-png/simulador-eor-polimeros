@@ -156,6 +156,7 @@ if archivos_validos:
             "Caudal (ml/min)": val_q,
             "Porosidad Efectiva (ϕ_eff)": porosidad_efectiva,
             "Tortuosidad Areal (τ)": tortuosidad,
+            "Velocidad Real (cm/s)": velocidad_real,
             "Perm. Abs. (mm²)": permeabilidad_mm2_abs,
             "Perm. Abs. (Darcy)": permeabilidad_darcy_abs,
             "Perm. Efec. (mm²)": permeabilidad_mm2_eff,
@@ -181,7 +182,7 @@ if archivos_validos:
     </style>
     """, unsafe_allow_html=True)
     
-    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Perm. Abs. (mm²)', 'Perm. Efec. (mm²)']])
+    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Perm. Abs. (mm²)', 'Perm. Efec. (mm²)', 'Perm. Abs. (Darcy)', 'Perm. Efec. (Darcy)']])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
