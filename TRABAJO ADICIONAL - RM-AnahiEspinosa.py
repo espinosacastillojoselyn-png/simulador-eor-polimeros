@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación EOR: Permeabilidad Comparativa en mm² y Darcys")
+st.title("Evaluación Micromodelos cEOR")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -295,9 +295,6 @@ if archivos_validos:
         st.latex(r"k_{eff} = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp(eff)}^2}")
         st.latex(rf"k_{{eff}} = {datos_fila['Perm. Efec. (mm²)']:.4f} \text{{ mm}}^2 \quad (\approx {datos_fila['Perm. Efec. (Darcy)']:.2f} \text{{ D}})")
 
-    st.markdown("""
-    > **Nota para la revisión del docente:** La presentación simultánea en $\text{mm}^2$ y Darcys permite comparar la permeabilidad teórica basada en la matriz granular frente a la efectiva obtenida mediante binarización óptica.
-    """)
 
     # --- 7. CURVAS DINÁMICAS ---
     st.markdown("---")
