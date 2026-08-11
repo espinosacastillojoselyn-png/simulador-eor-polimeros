@@ -9,7 +9,7 @@ import re
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Analizador de Movilidad EOR", layout="wide")
-st.title("Evaluación de Micromodelos EOR: Formulación Rigurosa Basada en Píxeles")
+st.title("Evaluación de Micromodelos EOR: Permeabilidad con Porosidad Efectiva en mm²")
 st.markdown("---")
 
 st.subheader("💧 Micromodelo Base - Inyección de Agua (Waterflooding al Breakthrough)")
@@ -46,11 +46,11 @@ porosidad_abs = st.sidebar.number_input("Porosidad Absoluta (fracción)", min_va
 t_bt = st.sidebar.number_input("Tiempo al Breakthrough (min)", value=650, step=10)
 
 st.sidebar.markdown("---")
-st.sidebar.success("🤖 Formulación Estricta en Términos de Píxeles Activa.")
+st.sidebar.success("🤖 Kozeny-Carman con Porosidad Efectiva y mm² Activo.")
 
 datos_consolidados = []
 
-# --- 3. PROCESAMIENTO EN BUCLE BASADO EN PÍXELES ---
+# --- 3. PROCESAMIENTO EN BUCLE ---
 if archivos_validos:
     for nombre_archivo in archivos_validos:
         ruta_imagen = os.path.join(CARPETA_MICROMODELOS, nombre_archivo)
@@ -100,8 +100,10 @@ if archivos_validos:
         pixeles_polimero = int(np.sum(mask_limpia == 255))
         pixeles_conectados = int(np.sum(mask_limpia > 0))
         
+        # --- CÁLCULO DE POROSIDAD EFECTIVA (ϕ_eff) BASADO EN PÍXELES ---
         fraccion_area_conectada = pixeles_conectados / pixeles_totales if pixeles_totales > 0 else 0
         porosidad_efectiva = float(porosidad_abs * fraccion_area_conectada)
+        porosidad_efectiva = max(0.01, min(porosidad_abs, porosidad_efectiva)) # Acotado físico
         
         pixeles_poros_totales = pixeles_totales * porosidad_abs
         fr_porcentaje = (pixeles_polimero / pixeles_poros_totales) * 100 if pixeles_poros_totales > 0 else 0
@@ -124,14 +126,15 @@ if archivos_validos:
         area_total_cm2 = ancho * largo_cm
         Vp_ml = area_total_cm2 * espesor * porosidad_abs
         
+        # --- PERMEABILIDAD USANDO POROSIDAD EFECTIVA (Kozeny-Carman Modificado) ---
         if eficiencia_barrido > 0 and tortuosidad > 0:
-            S_vp = (2 / espesor) + ((4 * (1 - porosidad_abs)) / (porosidad_abs * Dp_cm))
-            k_cm2 = porosidad_abs / (2 * tortuosidad * (S_vp**2))
+            S_vp = (2 / espesor) + ((4 * (1 - porosidad_efectiva)) / (porosidad_efectiva * Dp_cm))
+            k_cm2 = porosidad_efectiva / (2 * tortuosidad * (S_vp**2))
+            permeabilidad_mm2 = k_cm2 * 100.0 # Conversión de cm² a mm²
             permeabilidad_mD = k_cm2 * 1.013e11 
-            permeabilidad_mm2 = k_cm2 * 100.0 
         else:
-            permeabilidad_mD = 0.0
             permeabilidad_mm2 = 0.0
+            permeabilidad_mD = 0.0
 
         Np_ml = eficiencia_barrido * Vp_ml
         V_iny_ml = val_q * t_bt
@@ -146,8 +149,8 @@ if archivos_validos:
             "Tortuosidad Areal (τ)": tortuosidad,
             "Velocidad Real (cm/s)": velocidad_real,
             "Eficiencia Barrido EA (%)": fr_porcentaje,
-            "Permeabilidad (mD)": permeabilidad_mD,
             "Permeabilidad (mm²)": permeabilidad_mm2,
+            "Permeabilidad (mD)": permeabilidad_mD,
             "Np al BT (ml)": Np_ml,
             "VPI al BT": VPI_bt,
             "% Fr": fr_porcentaje,
@@ -169,7 +172,7 @@ if archivos_validos:
     </style>
     """, unsafe_allow_html=True)
     
-    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Permeabilidad (mD)']])
+    st.table(df_maestro[['Archivo', 'Polímero', 'Concentración (ppm)', 'Caudal (ml/min)', 'Porosidad Efectiva (ϕ_eff)', 'Tortuosidad Areal (τ)', '% Fr', 'Sor (fracción)', 'Permeabilidad (mm²)']])
 
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
@@ -270,18 +273,18 @@ if archivos_validos:
         """)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("#### 🔹 Permeabilidad (Kozeny-Carman con Parámetros en Píxeles)")
+    st.markdown("#### 🔹 Permeabilidad (Kozeny-Carman con Porosidad Efectiva)")
     col_k1, col_k2 = st.columns([1.5, 1])
     with col_k1:
-        st.markdown("**Permeabilidad Estimada (mD y mm²)**")
-        st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{abs})}{\phi_{abs} \cdot D_p}")
-        st.latex(r"k = \frac{\phi_{abs}}{2 \cdot \tau \cdot S_{vp}^2}")
-        st.latex(rf"k = {datos_fila['Permeabilidad (mD)']:.2f} \text{{ mD}} \quad (\approx {datos_fila['Permeabilidad (mm²)']:.4f} \text{{ mm}}^2)")
+        st.markdown("**Permeabilidad Estimada (mm² y mD)**")
+        st.latex(r"S_{vp} = \frac{2}{h} + \frac{4 \cdot (1 - \phi_{eff})}{\phi_{eff} \cdot D_p}")
+        st.latex(r"k = \frac{\phi_{eff}}{2 \cdot \tau \cdot S_{vp}^2}")
+        st.latex(rf"k = {datos_fila['Permeabilidad (mm²)']:.4f} \text{{ mm}}^2 \quad (\approx {datos_fila['Permeabilidad (mD)']:.2f} \text{{ mD}})")
     with col_k2:
         st.markdown(r"""
         **Donde:**
-        *   $\tau$ utiliza la longitud de los caminos de flujo extraídos por el esqueleto de píxeles.
-        *   Unidades presentadas en milidarcys (mD) y milímetros cuadrados ($\text{mm}^2$).
+        *   Se sustituye $\phi_{abs}$ por la **porosidad efectiva ($\phi_{eff}$)** en la ecuación de área superficial específica ($S_{vp}$) y de flujo ($k$).
+        *   Unidades presentadas primordialmente en milímetros cuadrados ($\text{mm}^2$).
         """)
 
     # --- 7. CURVAS DINÁMICAS ---
@@ -321,7 +324,6 @@ if archivos_validos:
         "Sor (fracción)": sor_array
     })
     
-    # Bloque de 4 Gráficos Organizados en Columnas
     col_g1, col_g2 = st.columns(2)
     with col_g1:
         st.markdown("**1. Curva de Producción Acumulada ($N_p$ vs $t$)**")
